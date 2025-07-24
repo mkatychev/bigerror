@@ -80,7 +80,7 @@ impl<K: Display, V: Debug> KeyValue<K, Dbg<V>> {
 #[macro_export]
 macro_rules! kv {
     (ty: $value: expr) => {
-        $crate::KeyValue($crate::Type::of_val(&$value), $value)
+        $crate::KeyValue($crate::Type::any(&$value), $value)
     };
     ($value: expr) => {
         $crate::KeyValue(stringify!($value), $value)
@@ -132,6 +132,10 @@ impl Type {
     /// Create a type attachment for the type of the given value.
     pub fn of_val<T: ?Sized>(_val: &T) -> Self {
         Self(simple_type_name::<T>())
+    }
+    /// Create a type attachment with a fully qualified URI
+    pub fn any<T: ?Sized>(_val: &T) -> Self {
+        Self(any::type_name::<T>())
     }
 }
 
@@ -351,6 +355,7 @@ pub struct Index<I: fmt::Display>(pub I);
 
 #[cfg(test)]
 mod test {
+
     use super::*;
 
     #[test]
