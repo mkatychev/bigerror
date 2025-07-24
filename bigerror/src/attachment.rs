@@ -63,6 +63,8 @@ impl<K: fmt::Display, V: fmt::Display> fmt::Display for KeyValue<K, V> {
     }
 }
 
+impl<C: Context> core::error::Error for KeyValue<Type, C> {}
+
 impl<K: Display, V: Debug> KeyValue<K, Dbg<V>> {
     /// Create a key-value pair where the value is debug-formatted.
     ///
