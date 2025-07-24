@@ -360,6 +360,7 @@ impl<T, C> AttachExt for Result<T, Report<C>> {
     }
 }
 
+#[cfg(feature = "tracing")]
 // intended to be a quick passthrough for propagating errors to the message log
 // in a functional matter
 pub trait LogError<T, E>
@@ -381,6 +382,8 @@ where
         A: fmt::Debug + Send + Sync + 'static;
 }
 
+// TODO add log crate support
+#[cfg(feature = "tracing")]
 impl<T, E> LogError<T, E> for Result<T, E>
 where
     E: fmt::Debug,

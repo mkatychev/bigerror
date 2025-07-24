@@ -8,12 +8,18 @@ documentation.workspace = true
 repository.workspace = true
 
 [features]
-default = ["std"]
+default = ["std", "backtrace"]
 std = ["error-stack/std", "error-stack/anyhow"]
-spantrace = ["error-stack/spantrace"]
+backtrace = ["error-stack/backtrace"]
+
+anyhow = ["error-stack/anyhow"]
 eyre = ["error-stack/eyre"]
-serde = ["error-stack/serde"]
+futures = ["error-stack/futures"]
 hooks = ["error-stack/hooks"]
+serde = ["error-stack/serde"]
+spantrace = ["error-stack/spantrace"]
+tracing = ["error-stack/tracing"]
+# unstable = ["error-stack/unstable"]
 
 
 [dependencies]

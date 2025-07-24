@@ -1,0 +1,13 @@
+---
+source: libs/error-stack/tests/test_serialize.rs
+expression: report
+---
+[
+  {
+    "context": "root error",
+    "attachments": [
+      "printable A",
+    ],
+    "sources": [],
+  },
+]
