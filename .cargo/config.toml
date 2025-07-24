@@ -1,7 +1,0 @@
-[source."git+https://github.com/hashintel/hash?rev=3a0e35d"]
-git = "https://github.com/hashintel/hash"
-rev = "3a0e35d"
-replace-with = "vendored-sources"
-
-[source.vendored-sources]
-directory = "vendor"
