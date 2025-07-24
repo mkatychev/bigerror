@@ -1,4 +1,5 @@
 #![cfg_attr(not(feature = "std"), no_std)]
+#![expect(deprecated, reason = "We use `Context` to maintain compatibility")]
 
 #[cfg(not(feature = "std"))]
 extern crate alloc;
@@ -8,18 +9,23 @@ use alloc::{format, vec};
 
 use error_stack::fmt::ColorMode;
 
+#[cfg(all(not(feature = "std"), feature = "tracing"))]
+use core::fmt;
 #[cfg(not(feature = "std"))]
 use core::{
     any::{self, TypeId},
-    fmt, mem,
+    mem,
     panic::Location,
 };
+#[cfg(all(feature = "std", feature = "tracing"))]
+use std::fmt;
 #[cfg(feature = "std")]
 use std::{
     any::{self, TypeId},
-    fmt, mem,
+    mem,
     panic::Location,
 };
+#[cfg(feature = "tracing")]
 use tracing::{Level, debug, error, info, trace, warn};
 
 pub use bigerror_derive::ThinContext;
