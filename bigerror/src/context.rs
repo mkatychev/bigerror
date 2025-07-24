@@ -1,5 +1,13 @@
 use derive_more as dm;
+
+use alloc::boxed::Box;
+
+#[cfg(not(feature = "std"))]
+use core::time::Duration;
+#[cfg(feature = "std")]
 use std::{path::Path, time::Duration};
+
+use alloc::{format, string::String, string::ToString};
 
 use error_stack::Context;
 
@@ -126,6 +134,7 @@ impl BoxError {
 }
 
 impl InvalidInput {
+    #[cfg(feature = "std")]
     #[track_caller]
     pub fn with_path(path: impl AsRef<Path>) -> Report<Self> {
         let path = path.as_ref().display().to_string();

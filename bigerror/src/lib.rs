@@ -1,5 +1,20 @@
+#![cfg_attr(not(feature = "std"), no_std)]
+
 use error_stack::fmt::ColorMode;
-use std::{any::TypeId, fmt, panic::Location};
+
+use alloc::{format, string::String};
+#[cfg(not(feature = "std"))]
+use core::{
+    any::{self, TypeId},
+    fmt, mem,
+    panic::Location,
+};
+#[cfg(feature = "std")]
+use std::{
+    any::{self, TypeId},
+    fmt, mem,
+    panic::Location,
+};
 use tracing::{debug, error, info, trace, warn, Level};
 
 pub use bigerror_derive::ThinContext;
@@ -12,6 +27,8 @@ pub use attachment::{Expectation, Field, Index, KeyValue, Type};
 
 use attachment::{Dbg, Debug, Display};
 pub use context::*;
+
+extern crate alloc;
 
 // TODO we'll have to do a builder pattern here at
 // some point
@@ -123,10 +140,10 @@ impl<T, E: Context + core::error::Error> ReportAs<T> for Result<T, E> {
         match self {
             Ok(v) => Ok(v),
             Err(e) => {
-                let ty = std::any::type_name_of_val(&e);
+                let ty = any::type_name_of_val(&e);
                 let mut external_report = Report::new(e).attach_printable(ty);
                 let mut curr_source = external_report.current_context().source();
-                let mut child_errs = vec![];
+                let mut child_errs = alloc::vec![];
                 while let Some(child_err) = curr_source {
                     let new_err = format!("{child_err}");
                     if Some(&new_err) != child_errs.last() {
@@ -154,7 +171,7 @@ impl<C: Context> IntoContext for Report<C> {
         if TypeId::of::<C>() == TypeId::of::<C2>() {
             // if C and C2 are zero-sized and have the same TypeId then they are covariant
             unsafe {
-                return std::mem::transmute::<Self, Report<C2>>(self.attach(*Location::caller()));
+                return mem::transmute::<Self, Report<C2>>(self.attach(*Location::caller()));
             }
         }
         self.change_context(C2::VALUE)

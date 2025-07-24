@@ -1,4 +1,9 @@
-use std::{fmt, time::Duration};
+#[cfg(not(feature = "std"))]
+use core::{any, fmt, ops, time::Duration};
+#[cfg(feature = "std")]
+use std::{any, fmt, ops, time::Duration};
+
+use alloc::{format, string::String, string::ToString};
 
 use derive_more as dm;
 pub use error_stack::{self, Context, Report, ResultExt};
@@ -202,7 +207,7 @@ impl From<Duration> for DisplayDuration {
     }
 }
 
-impl std::ops::Deref for DisplayDuration {
+impl ops::Deref for DisplayDuration {
     type Target = Duration;
 
     fn deref(&self) -> &Self::Target {
@@ -240,7 +245,7 @@ pub fn hms_string(duration: Duration) -> String {
 
 #[must_use]
 pub fn simple_type_name<T: ?Sized>() -> &'static str {
-    let full_type = std::any::type_name::<T>();
+    let full_type = any::type_name::<T>();
     // Option<T>, [T], Vec<T>
     if full_type.contains(['<', '[']) {
         return full_type;
