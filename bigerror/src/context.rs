@@ -7,7 +7,7 @@ use core::time::Duration;
 #[cfg(feature = "std")]
 use std::{path::Path, time::Duration};
 
-use alloc::{format, string::String, string::ToString};
+use alloc::{format, string::ToString};
 
 use error_stack::Context;
 

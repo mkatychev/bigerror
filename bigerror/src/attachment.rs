@@ -3,7 +3,10 @@ use core::{any, fmt, ops, time::Duration};
 #[cfg(feature = "std")]
 use std::{any, fmt, ops, time::Duration};
 
-use alloc::{format, string::String, string::ToString};
+use alloc::{
+    format,
+    string::{String, ToString},
+};
 
 use derive_more as dm;
 pub use error_stack::{self, Context, Report, ResultExt};

@@ -2,7 +2,7 @@
 
 use error_stack::fmt::ColorMode;
 
-use alloc::{format, string::String};
+use alloc::format;
 #[cfg(not(feature = "std"))]
 use core::{
     any::{self, TypeId},
