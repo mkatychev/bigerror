@@ -24,6 +24,7 @@ use std::{
     any::{self, TypeId},
     mem,
     panic::Location,
+    path::Path,
 };
 #[cfg(feature = "tracing")]
 use tracing::{Level, debug, error, info, trace, warn};
@@ -356,6 +357,18 @@ pub trait AttachExt {
         A: Display,
     {
         self.attach_kv(ty!(A), value)
+    }
+
+    /// Attach a lazily evaluated KeyValue path
+    /// Note: this is eagerly evaluated, suggested to use in `.map_err` calls
+    #[must_use]
+    #[cfg(feature = "std")]
+    fn attach_path<P: AsRef<Path>>(self, path: P) -> Self
+    where
+        Self: Sized,
+    {
+        let path = path.as_ref().display().to_string();
+        self.attach_kv("path", path)
     }
 }
 
