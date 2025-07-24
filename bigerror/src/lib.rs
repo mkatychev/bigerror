@@ -46,7 +46,7 @@ use attachment::{Dbg, Debug, Display};
 pub use context::*;
 
 /// Initialize error reporting with colored output.
-/// 
+///
 /// Sets the error-stack color mode to full color for enhanced readability
 /// in terminals that support ANSI color codes.
 pub fn init_colour() {
@@ -54,7 +54,7 @@ pub fn init_colour() {
 }
 
 /// Initialize error reporting with emphasis only (no full color).
-/// 
+///
 /// Sets the error-stack color mode to use emphasis styling without
 /// full color support, suitable for terminals with limited color support.
 pub fn init_emphasis() {
@@ -62,7 +62,7 @@ pub fn init_emphasis() {
 }
 
 /// Initialize error reporting with no ANSI formatting.
-/// 
+///
 /// Disables all color and emphasis styling for plain text output,
 /// suitable for logging or environments that don't support ANSI codes.
 pub fn init_no_ansi() {
@@ -70,19 +70,19 @@ pub fn init_no_ansi() {
 }
 
 /// A trait for zero-sized error types that provides convenient error creation methods.
-/// 
+///
 /// `ThinContext` extends the functionality of `error_stack::Context` by providing
 /// static methods for creating error reports with attachments. This trait is ideally
 /// used for zero-sized error types or types that hold only `'static` references.
-/// 
+///
 /// # Examples
-/// 
+///
 /// ```
 /// use bigerror::{ThinContext, Report};
-/// 
+///
 /// #[derive(bigerror::ThinContext)]
 /// pub struct MyError;
-/// 
+///
 /// // Create an error with an attachment
 /// let error: Report<MyError> = MyError::attach("Something went wrong");
 /// ```
@@ -94,7 +94,7 @@ where
     const VALUE: Self;
 
     /// Create a new error report by converting from another context type.
-    /// 
+    ///
     /// # Arguments
     /// * `ctx` - The source context to convert from
     fn report<C: Context>(ctx: C) -> Report<Self> {
@@ -102,14 +102,14 @@ where
     }
 
     /// Create an error report with an attachment computed by a closure.
-    /// 
+    ///
     /// This is useful for lazy evaluation of expensive attachment computations.
     #[track_caller]
-    fn attach_fn<A>(attach_fn: impl FnOnce() -> A) -> Report<Self>
+    fn attach_lazy<A>(attach_lazy: impl FnOnce() -> A) -> Report<Self>
     where
         A: Display,
     {
-        Report::new(Self::VALUE).attach_printable(attach_fn())
+        Report::new(Self::VALUE).attach_printable(attach_lazy())
     }
 
     /// Create an error report with a displayable attachment.
@@ -121,7 +121,7 @@ where
         Report::new(Self::VALUE).attach_printable(value)
     }
     /// Create an error report with a debug-formatted attachment.
-    /// 
+    ///
     /// The attachment will be formatted using `Debug` instead of `Display`.
     #[track_caller]
     fn attach_dbg<A>(value: A) -> Report<Self>
@@ -149,7 +149,7 @@ where
         Self::attach(KeyValue::dbg(key, value))
     }
     /// Create an error report with a field attachment.
-    /// 
+    ///
     /// This represents a property or field of a data structure and its status.
     #[track_caller]
     fn attach_field<S: Display>(key: &'static str, status: S) -> Report<Self> {
@@ -157,7 +157,7 @@ where
     }
 
     /// Create an error report showing expected vs actual values.
-    /// 
+    ///
     /// Useful for validation errors where you want to show what was expected
     /// versus what was actually received.
     #[track_caller]
@@ -166,7 +166,7 @@ where
     }
 
     /// Create an error report with a type-value pair attachment.
-    /// 
+    ///
     /// The key will be the type name and the value will be the provided value.
     #[track_caller]
     fn attach_ty_val<A: Display>(value: A) -> Report<Self> {
@@ -193,13 +193,13 @@ where
 }
 
 /// Trait for converting `Result<T, E>` into `Result<T, Report<C>>` with automatic error wrapping.
-/// 
+///
 /// This trait extends the functionality of `error_stack::IntoReport` by allowing
 /// implicit conversion from any error type to a specific context type with enhanced
 /// error reporting that includes source chain information.
 pub trait ReportAs<T> {
     /// Convert this result into a report with the specified context type.
-    /// 
+    ///
     /// This will wrap the error with additional context including the source
     /// error chain and type information.
     fn report_as<C: ThinContext>(self) -> Result<T, Report<C>>;
@@ -238,7 +238,7 @@ impl<T, E: Context + core::error::Error> ReportAs<T> for Result<T, E> {
 /// Trait for converting error reports from one context type to another.
 pub trait IntoContext {
     /// Convert this error report to use a different context type.
-    /// 
+    ///
     /// If the source and target context types are the same, this will perform
     /// an optimized conversion that preserves the original error structure.
     fn into_ctx<C2: ThinContext>(self) -> Report<C2>;
@@ -262,13 +262,13 @@ impl<C: Context> IntoContext for Report<C> {
 pub trait ResultIntoContext: ResultExt {
     /// Convert the error context type of this result.
     fn into_ctx<C2: ThinContext>(self) -> Result<Self::Ok, Report<C2>>;
-    
+
     /// Chain operations while converting error context (similar to `Result::and_then`).
     fn and_then_ctx<U, F, C2>(self, op: F) -> Result<U, Report<C2>>
     where
         C2: ThinContext,
         F: FnOnce(Self::Ok) -> Result<U, Report<C2>>;
-    
+
     /// Map the success value while converting error context (similar to `Result::map`).
     fn map_ctx<U, F, C2>(self, op: F) -> Result<U, Report<C2>>
     where
@@ -318,7 +318,7 @@ where
 }
 
 /// Extension trait that adds attachment methods to error reports and results.
-/// 
+///
 /// This trait provides convenient methods for attaching various types of context
 /// information to error reports.
 pub trait AttachExt {
@@ -328,7 +328,7 @@ pub trait AttachExt {
     where
         K: Display,
         V: Display;
-    
+
     /// Attach a key-value pair where the value is debug-formatted.
     #[must_use]
     fn attach_kv_dbg<K, V>(self, key: K, value: V) -> Self
@@ -453,7 +453,7 @@ impl<T, C> AttachExt for Result<T, Report<C>> {
 
 #[cfg(feature = "tracing")]
 /// Trait for logging errors while maintaining functional programming patterns.
-/// 
+///
 /// This trait provides methods for logging errors either by consuming them
 /// or by logging and then forwarding them in a functional chain.
 pub trait LogError<T, E>
@@ -558,7 +558,7 @@ impl<T, E> ClearResult<T, E> for Result<T, E> {
 }
 
 /// Extension trait for `Option<T>` that provides methods to convert `None` into error reports.
-/// 
+///
 /// This trait allows you to easily convert `Option` values into `Result<T, Report<NotFound>>`
 /// with descriptive error messages.
 pub trait OptionReport<T>
