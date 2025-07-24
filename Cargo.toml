@@ -13,12 +13,12 @@ documentation = "https://docs.rs/bigerror"
 repository = "https://github.com/knox-networks/bigerror"
 
 [workspace.dependencies]
-derive_more = { version = "1", features = ["display"] }
+derive_more = { version = "2", features = ["display"] }
 tracing = "0.1"
-proc-macro2 = "1.0.74"
-quote = "1.0.35"
+proc-macro2 = "1.0.95"
+quote = "1.0.40"
 error-stack = { git = "https://github.com/hashintel/hash", rev = "3a0e35d", default-features = false }
-syn = "2.0.46"
+syn = "2.0.104"
 bigerror-derive = { path = "./bigerror_derive", version = "0.1.0" }
 
 [workspace.lints.clippy]
