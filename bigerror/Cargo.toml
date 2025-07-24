@@ -9,7 +9,7 @@ repository.workspace = true
 
 [features]
 default = ["std", "backtrace"]
-std = ["error-stack/std", "error-stack/anyhow"]
+std = ["error-stack/std"]
 backtrace = ["error-stack/backtrace"]
 
 anyhow = ["error-stack/anyhow"]
