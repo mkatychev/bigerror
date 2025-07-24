@@ -3,6 +3,7 @@ use core::{any, fmt, ops, time::Duration};
 #[cfg(feature = "std")]
 use std::{any, fmt, ops, time::Duration};
 
+#[cfg(not(feature = "std"))]
 use alloc::{
     format,
     string::{String, ToString},

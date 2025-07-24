@@ -1,8 +1,13 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 
+#[cfg(not(feature = "std"))]
+extern crate alloc;
+
+#[cfg(not(feature = "std"))]
+use alloc::{format, vec};
+
 use error_stack::fmt::ColorMode;
 
-use alloc::format;
 #[cfg(not(feature = "std"))]
 use core::{
     any::{self, TypeId},
@@ -15,10 +20,10 @@ use std::{
     fmt, mem,
     panic::Location,
 };
-use tracing::{debug, error, info, trace, warn, Level};
+use tracing::{Level, debug, error, info, trace, warn};
 
 pub use bigerror_derive::ThinContext;
-pub use error_stack::{self, bail, ensure, report, Context, Report, ResultExt};
+pub use error_stack::{self, Context, Report, ResultExt, bail, ensure, report};
 
 pub mod attachment;
 pub mod context;
@@ -27,8 +32,6 @@ pub use attachment::{Expectation, Field, Index, KeyValue, Type};
 
 use attachment::{Dbg, Debug, Display};
 pub use context::*;
-
-extern crate alloc;
 
 // TODO we'll have to do a builder pattern here at
 // some point
@@ -143,7 +146,7 @@ impl<T, E: Context + core::error::Error> ReportAs<T> for Result<T, E> {
                 let ty = any::type_name_of_val(&e);
                 let mut external_report = Report::new(e).attach_printable(ty);
                 let mut curr_source = external_report.current_context().source();
-                let mut child_errs = alloc::vec![];
+                let mut child_errs = vec![];
                 while let Some(child_err) = curr_source {
                     let new_err = format!("{child_err}");
                     if Some(&new_err) != child_errs.last() {
@@ -579,6 +582,11 @@ macro_rules! expect_field {
 #[cfg(test)]
 mod test {
 
+    #[cfg(not(feature = "std"))]
+    use alloc::boxed::Box;
+    #[cfg(not(feature = "std"))]
+    use alloc::string::String;
+
     use crate::attachment::Invalid;
 
     use super::*;
@@ -606,6 +614,7 @@ mod test {
             assert!(result.is_err(), "{:?}", result.unwrap());
             if option_env!("PRINTERR").is_some() {
                 crate::init_colour();
+                #[cfg(feature = "std")]
                 println!("\n{:?}", result.unwrap_err());
             }
         };
@@ -614,6 +623,7 @@ mod test {
             assert!(result.is_err(), $($arg)+);
             if option_env!("PRINTERR").is_some() {
                 crate::init_colour();
+                #[cfg(feature = "std")]
                 println!("\n{:?}", result.unwrap_err());
             }
         };
@@ -765,9 +775,11 @@ mod test {
     fn attach_ty_val() {
         fn compare(mine: usize, other: usize) -> Result<(), Report<MyError>> {
             if other != mine {
-                bail!(InvalidInput::attach("expected my number!")
-                    .attach_ty_val(other)
-                    .into_ctx());
+                bail!(
+                    InvalidInput::attach("expected my number!")
+                        .attach_ty_val(other)
+                        .into_ctx()
+                );
             }
             Ok(())
         }

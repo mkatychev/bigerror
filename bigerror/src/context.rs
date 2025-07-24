@@ -1,22 +1,25 @@
 use derive_more as dm;
 
-use alloc::boxed::Box;
-
 #[cfg(not(feature = "std"))]
 use core::time::Duration;
 #[cfg(feature = "std")]
 use std::{path::Path, time::Duration};
 
-use alloc::{format, string::ToString};
+#[cfg(not(feature = "std"))]
+use alloc::{boxed::Box, format};
 
 use error_stack::Context;
 
 use crate::{
-    attachment::{self, simple_type_name, Display, FromTo, Unsupported},
-    ty, AttachExt, Index, Report, ThinContext,
+    Index, Report, ThinContext,
+    attachment::{self, Display, FromTo, Unsupported, simple_type_name},
+    ty,
 };
 
-use crate::{attachment::DisplayDuration, Field};
+#[cfg(feature = "std")]
+use crate::AttachExt;
+
+use crate::{Field, attachment::DisplayDuration};
 
 /// Used to enacpsulate opaque `dyn core::error::Error` types
 #[derive(Debug, dm::Display)]
