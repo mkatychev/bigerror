@@ -7,7 +7,7 @@ extern crate alloc;
 #[cfg(not(feature = "std"))]
 use alloc::{format, vec};
 
-use error_stack::fmt::ColorMode;
+use error_stack::{IntoReport, fmt::ColorMode};
 
 #[cfg(all(not(feature = "std"), feature = "tracing"))]
 use core::fmt;
@@ -277,14 +277,17 @@ pub trait ResultIntoContext: ResultExt {
         F: FnOnce(Self::Ok) -> U;
 }
 
-impl<T, C: 'static> ResultIntoContext for Result<T, Report<C>> {
+impl<T, E: IntoReport> ResultIntoContext for Result<T, E>
+where
+    <E as IntoReport>::Context: Sized + 'static,
+{
     #[inline]
     #[track_caller]
     fn into_ctx<C2: ThinContext>(self) -> Result<T, Report<C2>> {
         // Can't use `map_err` as `#[track_caller]` is unstable on closures
         match self {
             Ok(ok) => Ok(ok),
-            Err(report) => Err(IntoContext::into_ctx(report)),
+            Err(e) => Err(IntoContext::into_ctx(e.into_report())),
         }
     }
 
@@ -297,7 +300,7 @@ impl<T, C: 'static> ResultIntoContext for Result<T, Report<C>> {
     {
         match self {
             Ok(t) => op(t),
-            Err(ctx) => Err(ctx.change_context(C2::VALUE)),
+            Err(ctx) => Err(ctx.into_report().change_context(C2::VALUE)),
         }
     }
 
@@ -310,7 +313,7 @@ impl<T, C: 'static> ResultIntoContext for Result<T, Report<C>> {
     {
         match self {
             Ok(t) => Ok(op(t)),
-            Err(ctx) => Err(ctx.change_context(C2::VALUE)),
+            Err(ctx) => Err(ctx.into_report().change_context(C2::VALUE)),
         }
     }
 }
