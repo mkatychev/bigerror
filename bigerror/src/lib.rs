@@ -245,7 +245,7 @@ pub trait IntoContext {
     fn into_ctx<C2: ThinContext>(self) -> Report<C2>;
 }
 
-impl<C: Context> IntoContext for Report<C> {
+impl<C: 'static> IntoContext for Report<C> {
     #[inline]
     #[track_caller]
     fn into_ctx<C2: ThinContext>(self) -> Report<C2> {
@@ -277,17 +277,14 @@ pub trait ResultIntoContext: ResultExt {
         F: FnOnce(Self::Ok) -> U;
 }
 
-impl<T, C> ResultIntoContext for Result<T, Report<C>>
-where
-    C: Context,
-{
+impl<T, C: 'static> ResultIntoContext for Result<T, Report<C>> {
     #[inline]
     #[track_caller]
     fn into_ctx<C2: ThinContext>(self) -> Result<T, Report<C2>> {
         // Can't use `map_err` as `#[track_caller]` is unstable on closures
         match self {
             Ok(ok) => Ok(ok),
-            Err(report) => Err(report.into_ctx()),
+            Err(report) => Err(IntoContext::into_ctx(report)),
         }
     }
 
