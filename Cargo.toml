@@ -13,7 +13,7 @@ documentation = "https://docs.rs/bigerror"
 repository = "https://github.com/knox-networks/bigerror"
 
 [workspace.dependencies]
-derive_more = { version = "2", features = ["display"] }
+derive_more = { version = "2", features = ["display"], default-features = false }
 tracing = "0.1"
 proc-macro2 = "1.0.95"
 quote = "1.0.40"
