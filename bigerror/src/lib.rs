@@ -7,7 +7,7 @@ extern crate alloc;
 #[cfg(not(feature = "std"))]
 use alloc::{format, vec};
 
-use error_stack::{IntoReport, fmt::ColorMode};
+use error_stack::fmt::ColorMode;
 
 #[cfg(all(not(feature = "std"), feature = "tracing"))]
 use core::fmt;
@@ -32,7 +32,7 @@ use tracing::{Level, debug, error, info, trace, warn};
 /// Derive macro for implementing [`ThinContext`] trait on zero-sized error types.
 pub use bigerror_derive::ThinContext;
 /// Re-export of error-stack types and macros for convenience.
-pub use error_stack::{self, Context, Report, ResultExt, bail, ensure, report};
+pub use error_stack::{self, Context, IntoReport, Report, ResultExt, bail, ensure, report};
 
 /// Error attachment types and utilities for adding context to error reports.
 pub mod attachment;
