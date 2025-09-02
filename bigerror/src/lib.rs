@@ -110,7 +110,7 @@ where
     where
         A: Display,
     {
-        Report::new(Self::VALUE).attach_printable(attach_lazy())
+        Report::new(Self::VALUE).attach(attach_lazy())
     }
 
     /// Create an error report with a displayable attachment.
@@ -119,7 +119,7 @@ where
     where
         A: Display,
     {
-        Report::new(Self::VALUE).attach_printable(value)
+        Report::new(Self::VALUE).attach(value)
     }
     /// Create an error report with a debug-formatted attachment.
     ///
@@ -212,12 +212,12 @@ impl<T, E: Context + core::error::Error> ReportAs<T> for Result<T, E> {
     fn report_as<C: ThinContext>(self) -> Result<T, Report<C>> {
         // TODO #[track_caller] on closure
         // https://github.com/rust-lang/rust/issues/87417
-        // self.map_err(|e| Report::new(C::VALUE).attach_printable(e))
+        // self.map_err(|e| Report::new(C::VALUE).attach(e))
         match self {
             Ok(v) => Ok(v),
             Err(e) => {
                 let ty = any::type_name_of_val(&e);
-                let mut external_report = Report::new(e).attach_printable(ty);
+                let mut external_report = Report::new(e).attach(ty);
                 let mut curr_source = external_report.current_context().source();
                 let mut child_errs = vec![];
                 while let Some(child_err) = curr_source {
@@ -228,7 +228,7 @@ impl<T, E: Context + core::error::Error> ReportAs<T> for Result<T, E> {
                     curr_source = child_err.source();
                 }
                 while let Some(child_err) = child_errs.pop() {
-                    external_report = external_report.attach_printable(child_err);
+                    external_report = external_report.attach(child_err);
                 }
                 Err(external_report.into_ctx())
             }
@@ -252,7 +252,7 @@ impl<C: 'static> IntoContext for Report<C> {
         if TypeId::of::<C>() == TypeId::of::<C2>() {
             // if C and C2 are zero-sized and have the same TypeId then they are covariant
             unsafe {
-                return mem::transmute::<Self, Report<C2>>(self.attach(*Location::caller()));
+                return mem::transmute::<Self, Report<C2>>(self.attach_opaque(*Location::caller()));
             }
         }
         self.change_context(C2::VALUE)
@@ -380,7 +380,7 @@ impl<C> AttachExt for Report<C> {
         K: Display,
         V: Display,
     {
-        self.attach_printable(KeyValue(key, value))
+        self.attach(KeyValue(key, value))
     }
 
     #[inline]
@@ -390,7 +390,7 @@ impl<C> AttachExt for Report<C> {
         K: Display,
         V: Debug,
     {
-        self.attach_printable(KeyValue::dbg(key, value))
+        self.attach(KeyValue::dbg(key, value))
     }
 
     #[inline]
@@ -399,7 +399,7 @@ impl<C> AttachExt for Report<C> {
     where
         S: Display,
     {
-        self.attach_printable(Field::new(name, status))
+        self.attach(Field::new(name, status))
     }
 
     #[inline]
@@ -408,7 +408,7 @@ impl<C> AttachExt for Report<C> {
     where
         A: Debug,
     {
-        self.attach_printable(Dbg(value))
+        self.attach(Dbg(value))
     }
 }
 
@@ -422,7 +422,7 @@ impl<T, C> AttachExt for Result<T, Report<C>> {
     {
         match self {
             Ok(ok) => Ok(ok),
-            Err(report) => Err(report.attach_printable(KeyValue(key, value))),
+            Err(report) => Err(report.attach(KeyValue(key, value))),
         }
     }
 
@@ -435,7 +435,7 @@ impl<T, C> AttachExt for Result<T, Report<C>> {
     {
         match self {
             Ok(ok) => Ok(ok),
-            Err(report) => Err(report.attach_printable(KeyValue::dbg(key, value))),
+            Err(report) => Err(report.attach(KeyValue::dbg(key, value))),
         }
     }
 
@@ -447,7 +447,7 @@ impl<T, C> AttachExt for Result<T, Report<C>> {
     {
         match self {
             Ok(ok) => Ok(ok),
-            Err(report) => Err(report.attach_printable(Field::new(name, status))),
+            Err(report) => Err(report.attach(Field::new(name, status))),
         }
     }
 
@@ -459,7 +459,7 @@ impl<T, C> AttachExt for Result<T, Report<C>> {
     {
         match self {
             Ok(ok) => Ok(ok),
-            Err(report) => Err(report.attach_printable(Dbg(value))),
+            Err(report) => Err(report.attach(Dbg(value))),
         }
     }
 }
@@ -782,7 +782,7 @@ mod test {
             "NaN"
                 .parse::<usize>()
                 .map_err(ConversionError::from::<&str, usize>)
-                .attach_printable(ParseError)
+                .attach(ParseError)
         }
 
         assert_err!(output().change_context(MyError));
@@ -795,9 +795,9 @@ mod test {
                 .parse::<usize>()
                 .map_err(ConversionError::from::<&str, usize>)
                 .map_err(|e| match "More NaN".parse::<u32>() {
-                    Ok(attachment) => e.attach_printable(attachment),
+                    Ok(attachment) => e.attach(attachment),
                     Err(attachment_err) => e
-                        .attach_printable(ParseError)
+                        .attach(ParseError)
                         .attach_kv("\"More Nan\"", attachment_err),
                 })
         }
@@ -921,7 +921,7 @@ mod test {
         fn compare(mine: usize, other: usize) -> Result<(), Report<MyError>> {
             if other != mine {
                 return Err(InvalidInput::attach("expected my number!"))
-                    .attach_printable_lazy(|| kv!(ty: other)) // <usize>: 3
+                    .attach_lazy(|| kv!(ty: other)) // <usize>: 3
                     .into_ctx();
             }
             Ok(())

@@ -247,7 +247,7 @@ impl InvalidInput {
     #[track_caller]
     pub fn type_name<T: ?Sized>() -> Report<Self> {
         let type_name = simple_type_name::<T>();
-        Report::new(Self).attach_printable(format!("type: {type_name}"))
+        Report::new(Self).attach(format!("type: {type_name}"))
     }
 
     /// Create an invalid input error for unsupported operations.
@@ -256,7 +256,7 @@ impl InvalidInput {
     /// the requested operation is not supported.
     #[track_caller]
     pub fn unsupported() -> Report<Self> {
-        Report::new(Self).attach_printable(Unsupported)
+        Report::new(Self).attach(Unsupported)
     }
 }
 
@@ -267,7 +267,7 @@ impl ConversionError {
     /// and target types of the failed conversion.
     #[track_caller]
     pub fn new<F, T>() -> Report<Self> {
-        Report::new(Self).attach_printable(FromTo(ty!(F), ty!(T)))
+        Report::new(Self).attach(FromTo(ty!(F), ty!(T)))
     }
 
     /// Create a conversion error from an existing context with type information.
@@ -276,7 +276,7 @@ impl ConversionError {
     /// and attaches the source and target type information.
     #[track_caller]
     pub fn from<F, T>(ctx: impl Context) -> Report<Self> {
-        Self::report(ctx).attach_printable(FromTo(ty!(F), ty!(T)))
+        Self::report(ctx).attach(FromTo(ty!(F), ty!(T)))
     }
 }
 
@@ -287,7 +287,7 @@ impl NotFound {
     /// field is missing from a data structure.
     #[track_caller]
     pub fn with_field(field: &'static str) -> Report<Self> {
-        Report::new(Self).attach_printable(Field::new(field, attachment::Missing))
+        Report::new(Self).attach(Field::new(field, attachment::Missing))
     }
 
     /// Create a not found error for a missing indexed item.
@@ -306,6 +306,6 @@ impl ParseError {
     /// field could not be parsed correctly.
     #[track_caller]
     pub fn with_field(field: &'static str) -> Report<Self> {
-        Report::new(Self).attach_printable(Field::new(field, attachment::Invalid))
+        Report::new(Self).attach(Field::new(field, attachment::Invalid))
     }
 }
