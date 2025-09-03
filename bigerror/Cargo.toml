@@ -22,3 +22,5 @@ tracing.workspace = true
 bigerror-derive.workspace = true
 derive_more.workspace = true
 
+[lints]
+workspace = true

@@ -1,9 +1,29 @@
+#![cfg_attr(not(feature = "std"), no_std)]
+
+#[cfg(not(feature = "std"))]
+extern crate alloc;
+
+#[cfg(not(feature = "std"))]
+use alloc::{format, vec};
+
 use error_stack::fmt::ColorMode;
-use std::{any::TypeId, fmt, panic::Location};
-use tracing::{debug, error, info, trace, warn, Level};
+
+#[cfg(not(feature = "std"))]
+use core::{
+    any::{self, TypeId},
+    fmt, mem,
+    panic::Location,
+};
+#[cfg(feature = "std")]
+use std::{
+    any::{self, TypeId},
+    fmt, mem,
+    panic::Location,
+};
+use tracing::{Level, debug, error, info, trace, warn};
 
 pub use bigerror_derive::ThinContext;
-pub use error_stack::{self, bail, ensure, report, Context, Report, ResultExt};
+pub use error_stack::{self, Context, Report, ResultExt, bail, ensure, report};
 
 pub mod attachment;
 pub mod context;
@@ -123,7 +143,7 @@ impl<T, E: Context + core::error::Error> ReportAs<T> for Result<T, E> {
         match self {
             Ok(v) => Ok(v),
             Err(e) => {
-                let ty = std::any::type_name_of_val(&e);
+                let ty = any::type_name_of_val(&e);
                 let mut external_report = Report::new(e).attach_printable(ty);
                 let mut curr_source = external_report.current_context().source();
                 let mut child_errs = vec![];
@@ -154,7 +174,7 @@ impl<C: Context> IntoContext for Report<C> {
         if TypeId::of::<C>() == TypeId::of::<C2>() {
             // if C and C2 are zero-sized and have the same TypeId then they are covariant
             unsafe {
-                return std::mem::transmute::<Self, Report<C2>>(self.attach(*Location::caller()));
+                return mem::transmute::<Self, Report<C2>>(self.attach(*Location::caller()));
             }
         }
         self.change_context(C2::VALUE)
@@ -562,6 +582,11 @@ macro_rules! expect_field {
 #[cfg(test)]
 mod test {
 
+    #[cfg(not(feature = "std"))]
+    use alloc::boxed::Box;
+    #[cfg(not(feature = "std"))]
+    use alloc::string::String;
+
     use crate::attachment::Invalid;
 
     use super::*;
@@ -589,6 +614,7 @@ mod test {
             assert!(result.is_err(), "{:?}", result.unwrap());
             if option_env!("PRINTERR").is_some() {
                 crate::init_colour();
+                #[cfg(feature = "std")]
                 println!("\n{:?}", result.unwrap_err());
             }
         };
@@ -597,6 +623,7 @@ mod test {
             assert!(result.is_err(), $($arg)+);
             if option_env!("PRINTERR").is_some() {
                 crate::init_colour();
+                #[cfg(feature = "std")]
                 println!("\n{:?}", result.unwrap_err());
             }
         };
@@ -748,9 +775,11 @@ mod test {
     fn attach_ty_val() {
         fn compare(mine: usize, other: usize) -> Result<(), Report<MyError>> {
             if other != mine {
-                bail!(InvalidInput::attach("expected my number!")
-                    .attach_ty_val(other)
-                    .into_ctx());
+                bail!(
+                    InvalidInput::attach("expected my number!")
+                        .attach_ty_val(other)
+                        .into_ctx()
+                );
             }
             Ok(())
         }

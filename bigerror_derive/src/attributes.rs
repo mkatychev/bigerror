@@ -1,5 +1,5 @@
 use quote::ToTokens;
-use syn::{meta::ParseNestedMeta, parse_quote, DeriveInput, Error, Path, Token};
+use syn::{DeriveInput, Error, Path, Token, meta::ParseNestedMeta, parse_quote};
 
 fn try_set_attribute<T: ToTokens>(
     attribute: &mut Option<T>,

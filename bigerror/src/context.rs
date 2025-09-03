@@ -1,14 +1,25 @@
 use derive_more as dm;
+
+#[cfg(not(feature = "std"))]
+use core::time::Duration;
+#[cfg(feature = "std")]
 use std::{path::Path, time::Duration};
+
+#[cfg(not(feature = "std"))]
+use alloc::{boxed::Box, format};
 
 use error_stack::Context;
 
 use crate::{
-    attachment::{self, simple_type_name, Display, FromTo, Unsupported},
-    ty, AttachExt, Index, Report, ThinContext,
+    Index, Report, ThinContext,
+    attachment::{self, Display, FromTo, Unsupported, simple_type_name},
+    ty,
 };
 
-use crate::{attachment::DisplayDuration, Field};
+#[cfg(feature = "std")]
+use crate::AttachExt;
+
+use crate::{Field, attachment::DisplayDuration};
 
 /// Used to enacpsulate opaque `dyn core::error::Error` types
 #[derive(Debug, dm::Display)]
@@ -126,6 +137,7 @@ impl BoxError {
 }
 
 impl InvalidInput {
+    #[cfg(feature = "std")]
     #[track_caller]
     pub fn with_path(path: impl AsRef<Path>) -> Report<Self> {
         let path = path.as_ref().display().to_string();
