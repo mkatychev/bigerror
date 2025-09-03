@@ -8,17 +8,23 @@ documentation.workspace = true
 repository.workspace = true
 
 [features]
-default = ["std"]
-std = ["error-stack/std", "error-stack/anyhow"]
-spantrace = ["error-stack/spantrace"]
+default = ["std", "backtrace"]
+std = ["error-stack/std", "derive_more/std", "tracing?/std"]
+backtrace = ["error-stack/backtrace"]
+
+anyhow = ["error-stack/anyhow"]
 eyre = ["error-stack/eyre"]
-serde = ["error-stack/serde"]
+futures = ["error-stack/futures"]
 hooks = ["error-stack/hooks"]
+serde = ["error-stack/serde"]
+spantrace = ["error-stack/spantrace"]
+tracing = ["error-stack/tracing"]
+# unstable = ["error-stack/unstable"]
 
 
 [dependencies]
 error-stack.workspace = true
-tracing.workspace = true
+tracing = { workspace = true, optional = true, features = ["attributes"] }
 bigerror-derive.workspace = true
 derive_more.workspace = true
 

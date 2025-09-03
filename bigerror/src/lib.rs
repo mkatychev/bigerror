@@ -1,4 +1,5 @@
 #![cfg_attr(not(feature = "std"), no_std)]
+#![expect(deprecated, reason = "We use `Context` to maintain compatibility")]
 
 #[cfg(not(feature = "std"))]
 extern crate alloc;
@@ -8,72 +9,121 @@ use alloc::{format, vec};
 
 use error_stack::fmt::ColorMode;
 
+#[cfg(all(not(feature = "std"), feature = "tracing"))]
+use core::fmt;
 #[cfg(not(feature = "std"))]
 use core::{
     any::{self, TypeId},
-    fmt, mem,
+    mem,
     panic::Location,
 };
+#[cfg(all(feature = "std", feature = "tracing"))]
+use std::fmt;
 #[cfg(feature = "std")]
 use std::{
     any::{self, TypeId},
-    fmt, mem,
+    mem,
     panic::Location,
+    path::Path,
 };
+#[cfg(feature = "tracing")]
 use tracing::{Level, debug, error, info, trace, warn};
 
+/// Derive macro for implementing [`ThinContext`] trait on zero-sized error types.
 pub use bigerror_derive::ThinContext;
-pub use error_stack::{self, Context, Report, ResultExt, bail, ensure, report};
+/// Re-export of error-stack types and macros for convenience.
+pub use error_stack::{self, Context, IntoReport, Report, ResultExt, bail, ensure, report};
 
+/// Error attachment types and utilities for adding context to error reports.
 pub mod attachment;
+/// Common error context types for different categories of errors.
 pub mod context;
 
+/// Re-export of commonly used attachment types.
 pub use attachment::{Expectation, Field, Index, KeyValue, Type};
 
 use attachment::{Dbg, Debug, Display};
+/// Re-export of all error context types.
 pub use context::*;
 
-// TODO we'll have to do a builder pattern here at
-// some point
+/// Initialize error reporting with colored output.
+///
+/// Sets the error-stack color mode to full color for enhanced readability
+/// in terminals that support ANSI color codes.
 pub fn init_colour() {
     Report::set_color_mode(ColorMode::Color);
 }
 
+/// Initialize error reporting with emphasis only (no full color).
+///
+/// Sets the error-stack color mode to use emphasis styling without
+/// full color support, suitable for terminals with limited color support.
 pub fn init_emphasis() {
     Report::set_color_mode(ColorMode::Emphasis);
 }
 
+/// Initialize error reporting with no ANSI formatting.
+///
+/// Disables all color and emphasis styling for plain text output,
+/// suitable for logging or environments that don't support ANSI codes.
 pub fn init_no_ansi() {
     Report::set_color_mode(ColorMode::None);
 }
 
-/// `ThinContext` behaves as an `error_stack::ContextExt`
-/// ideally used for zero sized errors or ones that hold a `'static` ref/value
+/// A trait for zero-sized error types that provides convenient error creation methods.
+///
+/// `ThinContext` extends the functionality of `error_stack::Context` by providing
+/// static methods for creating error reports with attachments. This trait is ideally
+/// used for zero-sized error types or types that hold only `'static` references.
+///
+/// # Examples
+///
+/// ```
+/// use bigerror::{ThinContext, Report};
+///
+/// #[derive(bigerror::ThinContext)]
+/// pub struct MyError;
+///
+/// // Create an error with an attachment
+/// let error: Report<MyError> = MyError::attach("Something went wrong");
+/// ```
 pub trait ThinContext
 where
     Self: Sized + Context,
 {
+    /// The singleton value for this zero-sized error type.
     const VALUE: Self;
 
+    /// Create a new error report by converting from another context type.
+    ///
+    /// # Arguments
+    /// * `ctx` - The source context to convert from
     fn report<C: Context>(ctx: C) -> Report<Self> {
         Report::new(ctx).change_context(Self::VALUE)
     }
 
+    /// Create an error report with an attachment computed by a closure.
+    ///
+    /// This is useful for lazy evaluation of expensive attachment computations.
     #[track_caller]
-    fn attach_fn<A>(attach_fn: impl FnOnce() -> A) -> Report<Self>
+    fn attach_lazy<A>(attach_lazy: impl FnOnce() -> A) -> Report<Self>
     where
         A: Display,
     {
-        Report::new(Self::VALUE).attach_printable(attach_fn())
+        Report::new(Self::VALUE).attach(attach_lazy())
     }
 
+    /// Create an error report with a displayable attachment.
     #[track_caller]
     fn attach<A>(value: A) -> Report<Self>
     where
         A: Display,
     {
-        Report::new(Self::VALUE).attach_printable(value)
+        Report::new(Self::VALUE).attach(value)
     }
+    /// Create an error report with a debug-formatted attachment.
+    ///
+    /// The attachment will be formatted using `Debug` instead of `Display`.
     #[track_caller]
     fn attach_dbg<A>(value: A) -> Report<Self>
     where
@@ -81,6 +131,7 @@ where
     {
         Self::attach(Dbg(value))
     }
+    /// Create an error report with a key-value pair attachment.
     #[track_caller]
     fn attach_kv<K, V>(key: K, value: V) -> Report<Self>
     where
@@ -89,6 +140,7 @@ where
     {
         Self::attach(KeyValue(key, value))
     }
+    /// Create an error report with a key-value pair where the value is debug-formatted.
     #[track_caller]
     fn attach_kv_dbg<K, V>(key: K, value: V) -> Report<Self>
     where
@@ -97,39 +149,60 @@ where
     {
         Self::attach(KeyValue::dbg(key, value))
     }
+    /// Create an error report with a field attachment.
+    ///
+    /// This represents a property or field of a data structure and its status.
     #[track_caller]
     fn attach_field<S: Display>(key: &'static str, status: S) -> Report<Self> {
         Self::attach(Field::new(key, status))
     }
 
+    /// Create an error report showing expected vs actual values.
+    ///
+    /// Useful for validation errors where you want to show what was expected
+    /// versus what was actually received.
     #[track_caller]
     fn expected_actual<A: attachment::Display>(expected: A, actual: A) -> Report<Self> {
         Self::attach(Expectation { expected, actual })
     }
 
+    /// Create an error report with a type-value pair attachment.
+    ///
+    /// The key will be the type name and the value will be the provided value.
     #[track_caller]
     fn attach_ty_val<A: Display>(value: A) -> Report<Self> {
         Self::attach_kv(ty!(A), value)
     }
 
+    /// Create an error report with a type-value pair where the value is debug-formatted.
     #[track_caller]
     fn attach_ty_dbg<A: Debug>(value: A) -> Report<Self> {
         Self::attach_kv_dbg(ty!(A), value)
     }
 
+    /// Create an error report with just a type attachment.
     #[track_caller]
     fn attach_ty<A>() -> Report<Self> {
         Self::attach(ty!(A))
     }
 
+    /// Create an error report with a type as field name and status.
     #[track_caller]
     fn attach_ty_status<A: Send + Sync + 'static>(status: impl Display) -> Report<Self> {
         Self::attach(Field::new(ty!(A), status))
     }
 }
 
-/// Extends [`error_stack::IntoReport`] to allow an implicit `E -> Report<C>` inference
+/// Trait for converting `Result<T, E>` into `Result<T, Report<C>>` with automatic error wrapping.
+///
+/// This trait extends the functionality of `error_stack::IntoReport` by allowing
+/// implicit conversion from any error type to a specific context type with enhanced
+/// error reporting that includes source chain information.
 pub trait ReportAs<T> {
+    /// Convert this result into a report with the specified context type.
+    ///
+    /// This will wrap the error with additional context including the source
+    /// error chain and type information.
     fn report_as<C: ThinContext>(self) -> Result<T, Report<C>>;
 }
 
@@ -139,12 +212,12 @@ impl<T, E: Context + core::error::Error> ReportAs<T> for Result<T, E> {
     fn report_as<C: ThinContext>(self) -> Result<T, Report<C>> {
         // TODO #[track_caller] on closure
         // https://github.com/rust-lang/rust/issues/87417
-        // self.map_err(|e| Report::new(C::VALUE).attach_printable(e))
+        // self.map_err(|e| Report::new(C::VALUE).attach(e))
         match self {
             Ok(v) => Ok(v),
             Err(e) => {
                 let ty = any::type_name_of_val(&e);
-                let mut external_report = Report::new(e).attach_printable(ty);
+                let mut external_report = Report::new(e).attach(ty);
                 let mut curr_source = external_report.current_context().source();
                 let mut child_errs = vec![];
                 while let Some(child_err) = curr_source {
@@ -155,7 +228,7 @@ impl<T, E: Context + core::error::Error> ReportAs<T> for Result<T, E> {
                     curr_source = child_err.source();
                 }
                 while let Some(child_err) = child_errs.pop() {
-                    external_report = external_report.attach_printable(child_err);
+                    external_report = external_report.attach(child_err);
                 }
                 Err(external_report.into_ctx())
             }
@@ -163,41 +236,50 @@ impl<T, E: Context + core::error::Error> ReportAs<T> for Result<T, E> {
     }
 }
 
+/// Trait for converting error reports from one context type to another.
 pub trait IntoContext {
+    /// Convert this error report to use a different context type.
+    ///
+    /// If the source and target context types are the same, this will perform
+    /// an optimized conversion that preserves the original error structure.
     fn into_ctx<C2: ThinContext>(self) -> Report<C2>;
 }
 
-impl<C: Context> IntoContext for Report<C> {
+impl<C: 'static> IntoContext for Report<C> {
     #[inline]
     #[track_caller]
     fn into_ctx<C2: ThinContext>(self) -> Report<C2> {
         if TypeId::of::<C>() == TypeId::of::<C2>() {
             // if C and C2 are zero-sized and have the same TypeId then they are covariant
             unsafe {
-                return mem::transmute::<Self, Report<C2>>(self.attach(*Location::caller()));
+                return mem::transmute::<Self, Report<C2>>(self.attach_opaque(*Location::caller()));
             }
         }
         self.change_context(C2::VALUE)
     }
 }
 
+/// Extension trait for `Result<T, Report<C>>` that provides context conversion methods.
 pub trait ResultIntoContext: ResultExt {
+    /// Convert the error context type of this result.
     fn into_ctx<C2: ThinContext>(self) -> Result<Self::Ok, Report<C2>>;
-    // Result::and_then
+
+    /// Chain operations while converting error context (similar to `Result::and_then`).
     fn and_then_ctx<U, F, C2>(self, op: F) -> Result<U, Report<C2>>
     where
         C2: ThinContext,
         F: FnOnce(Self::Ok) -> Result<U, Report<C2>>;
-    // Result::map
+
+    /// Map the success value while converting error context (similar to `Result::map`).
     fn map_ctx<U, F, C2>(self, op: F) -> Result<U, Report<C2>>
     where
         C2: ThinContext,
         F: FnOnce(Self::Ok) -> U;
 }
 
-impl<T, C> ResultIntoContext for Result<T, Report<C>>
+impl<T, E: IntoReport> ResultIntoContext for Result<T, E>
 where
-    C: Context,
+    <E as IntoReport>::Context: Sized + 'static,
 {
     #[inline]
     #[track_caller]
@@ -205,7 +287,7 @@ where
         // Can't use `map_err` as `#[track_caller]` is unstable on closures
         match self {
             Ok(ok) => Ok(ok),
-            Err(report) => Err(report.into_ctx()),
+            Err(e) => Err(IntoContext::into_ctx(e.into_report())),
         }
     }
 
@@ -218,7 +300,7 @@ where
     {
         match self {
             Ok(t) => op(t),
-            Err(ctx) => Err(ctx.change_context(C2::VALUE)),
+            Err(ctx) => Err(ctx.into_report().change_context(C2::VALUE)),
         }
     }
 
@@ -231,33 +313,43 @@ where
     {
         match self {
             Ok(t) => Ok(op(t)),
-            Err(ctx) => Err(ctx.change_context(C2::VALUE)),
+            Err(ctx) => Err(ctx.into_report().change_context(C2::VALUE)),
         }
     }
 }
 
+/// Extension trait that adds attachment methods to error reports and results.
+///
+/// This trait provides convenient methods for attaching various types of context
+/// information to error reports.
 pub trait AttachExt {
+    /// Attach a key-value pair to the error.
     #[must_use]
     fn attach_kv<K, V>(self, key: K, value: V) -> Self
     where
         K: Display,
         V: Display;
+
+    /// Attach a key-value pair where the value is debug-formatted.
     #[must_use]
     fn attach_kv_dbg<K, V>(self, key: K, value: V) -> Self
     where
         K: Display,
         V: Debug;
 
+    /// Attach a field with its status.
     #[must_use]
     fn attach_field_status<S>(self, name: &'static str, status: S) -> Self
     where
         S: Display;
 
+    /// Attach a debug-formatted value.
     #[must_use]
     fn attach_dbg<A>(self, value: A) -> Self
     where
         A: Debug;
 
+    /// Attach a type-value pair where the type name is the key.
     #[must_use]
     fn attach_ty_val<A>(self, value: A) -> Self
     where
@@ -265,6 +357,18 @@ pub trait AttachExt {
         A: Display,
     {
         self.attach_kv(ty!(A), value)
+    }
+
+    /// Attach a lazily evaluated KeyValue path
+    /// Note: this is eagerly evaluated, suggested to use in `.map_err` calls
+    #[must_use]
+    #[cfg(feature = "std")]
+    fn attach_path<P: AsRef<Path>>(self, path: P) -> Self
+    where
+        Self: Sized,
+    {
+        let path = path.as_ref().display().to_string();
+        self.attach_kv("path", path)
     }
 }
 
@@ -276,7 +380,7 @@ impl<C> AttachExt for Report<C> {
         K: Display,
         V: Display,
     {
-        self.attach_printable(KeyValue(key, value))
+        self.attach(KeyValue(key, value))
     }
 
     #[inline]
@@ -286,7 +390,7 @@ impl<C> AttachExt for Report<C> {
         K: Display,
         V: Debug,
     {
-        self.attach_printable(KeyValue::dbg(key, value))
+        self.attach(KeyValue::dbg(key, value))
     }
 
     #[inline]
@@ -295,7 +399,7 @@ impl<C> AttachExt for Report<C> {
     where
         S: Display,
     {
-        self.attach_printable(Field::new(name, status))
+        self.attach(Field::new(name, status))
     }
 
     #[inline]
@@ -304,7 +408,7 @@ impl<C> AttachExt for Report<C> {
     where
         A: Debug,
     {
-        self.attach_printable(Dbg(value))
+        self.attach(Dbg(value))
     }
 }
 
@@ -318,7 +422,7 @@ impl<T, C> AttachExt for Result<T, Report<C>> {
     {
         match self {
             Ok(ok) => Ok(ok),
-            Err(report) => Err(report.attach_printable(KeyValue(key, value))),
+            Err(report) => Err(report.attach(KeyValue(key, value))),
         }
     }
 
@@ -331,7 +435,7 @@ impl<T, C> AttachExt for Result<T, Report<C>> {
     {
         match self {
             Ok(ok) => Ok(ok),
-            Err(report) => Err(report.attach_printable(KeyValue::dbg(key, value))),
+            Err(report) => Err(report.attach(KeyValue::dbg(key, value))),
         }
     }
 
@@ -343,7 +447,7 @@ impl<T, C> AttachExt for Result<T, Report<C>> {
     {
         match self {
             Ok(ok) => Ok(ok),
-            Err(report) => Err(report.attach_printable(Field::new(name, status))),
+            Err(report) => Err(report.attach(Field::new(name, status))),
         }
     }
 
@@ -355,32 +459,38 @@ impl<T, C> AttachExt for Result<T, Report<C>> {
     {
         match self {
             Ok(ok) => Ok(ok),
-            Err(report) => Err(report.attach_printable(Dbg(value))),
+            Err(report) => Err(report.attach(Dbg(value))),
         }
     }
 }
 
-// intended to be a quick passthrough for propagating errors to the message log
-// in a functional matter
+#[cfg(feature = "tracing")]
+/// Trait for logging errors while maintaining functional programming patterns.
+///
+/// This trait provides methods for logging errors either by consuming them
+/// or by logging and then forwarding them in a functional chain.
 pub trait LogError<T, E>
 where
     E: fmt::Debug,
 {
-    // swallows and logs error
+    /// Log the error and consume the result (swallows the error).
     fn log_err(self);
-    // swallows and logs error with attachment
+    /// Log the error with an additional attachment and consume the result.
     fn log_attached_err<A>(self, attachment: A)
     where
         A: fmt::Debug + Send + Sync + 'static;
-    // logs error and forwards
+    /// Log the error at ERROR level and forward the result.
     fn and_log_err(self) -> Result<T, E>;
+    /// Log the error at the specified level and forward the result.
     fn and_log(self, level: Level) -> Result<T, E>;
-    // logs error and forwards with attachment
+    /// Log the error with an attachment and forward the result.
     fn and_attached_err<A>(self, attachment: A) -> Result<T, E>
     where
         A: fmt::Debug + Send + Sync + 'static;
 }
 
+// TODO add log crate support
+#[cfg(feature = "tracing")]
 impl<T, E> LogError<T, E> for Result<T, E>
 where
     E: fmt::Debug,
@@ -440,10 +550,13 @@ where
     }
 }
 
+/// Trait for clearing either the success or error part of a `Result`.
 pub trait ClearResult<T, E> {
+    /// Clear the error type, converting any error to `()`.
     #[allow(clippy::result_unit_err)]
     fn clear_err(self) -> Result<T, ()>;
 
+    /// Clear the success type, converting any success value to `()`.
     fn clear_ok(self) -> Result<(), E>;
 }
 
@@ -457,18 +570,25 @@ impl<T, E> ClearResult<T, E> for Result<T, E> {
     }
 }
 
-/// Used to produce [`NotFound`] reports from an [`Option`]
+/// Extension trait for `Option<T>` that provides methods to convert `None` into error reports.
+///
+/// This trait allows you to easily convert `Option` values into `Result<T, Report<NotFound>>`
+/// with descriptive error messages.
 pub trait OptionReport<T>
 where
     Self: Sized,
 {
+    /// Convert `None` into a `NotFound` error with type information.
     fn expect_or(self) -> Result<T, Report<NotFound>>;
+    /// Convert `None` into a `NotFound` error with key-value context.
     fn expect_kv<K, V>(self, key: K, value: V) -> Result<T, Report<NotFound>>
     where
         K: Display,
         V: Display;
+    /// Convert `None` into a `NotFound` error for a missing field.
     fn expect_field(self, field: &'static str) -> Result<T, Report<NotFound>>;
 
+    /// Convert `None` into a `NotFound` error with key-value context where value is debug-formatted.
     #[inline]
     #[track_caller]
     fn expect_kv_dbg<K, V>(self, key: K, value: V) -> Result<T, Report<NotFound>>
@@ -479,12 +599,14 @@ where
         self.expect_kv(key, Dbg(value))
     }
 
+    /// Convert `None` into a `NotFound` error for a missing indexed item.
     #[inline]
     #[track_caller]
     fn expect_by<K: Display>(self, key: K) -> Result<T, Report<NotFound>> {
         self.expect_kv(Index(key), ty!(T))
     }
 
+    /// Convert `None` into a `NotFound` error with a lazily-computed index key.
     #[inline]
     #[track_caller]
     fn expect_by_fn<F, K>(self, key_fn: F) -> Result<T, Report<NotFound>>
@@ -660,7 +782,7 @@ mod test {
             "NaN"
                 .parse::<usize>()
                 .map_err(ConversionError::from::<&str, usize>)
-                .attach_printable(ParseError)
+                .attach(ParseError)
         }
 
         assert_err!(output().change_context(MyError));
@@ -673,9 +795,9 @@ mod test {
                 .parse::<usize>()
                 .map_err(ConversionError::from::<&str, usize>)
                 .map_err(|e| match "More NaN".parse::<u32>() {
-                    Ok(attachment) => e.attach_printable(attachment),
+                    Ok(attachment) => e.attach(attachment),
                     Err(attachment_err) => e
-                        .attach_printable(ParseError)
+                        .attach(ParseError)
                         .attach_kv("\"More Nan\"", attachment_err),
                 })
         }
@@ -799,7 +921,7 @@ mod test {
         fn compare(mine: usize, other: usize) -> Result<(), Report<MyError>> {
             if other != mine {
                 return Err(InvalidInput::attach("expected my number!"))
-                    .attach_printable_lazy(|| kv!(ty: other)) // <usize>: 3
+                    .attach_lazy(|| kv!(ty: other)) // <usize>: 3
                     .into_ctx();
             }
             Ok(())

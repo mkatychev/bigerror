@@ -5,7 +5,7 @@ members = [
 resolver = "2"
 
 [workspace.package]
-version = "0.10.0"
+version = "0.10.0-alpha"
 edition = "2024"
 description = "handle big errors ¯\\_(ツ)_/¯"
 license = "MIT"
@@ -13,12 +13,12 @@ documentation = "https://docs.rs/bigerror"
 repository = "https://github.com/knox-networks/bigerror"
 
 [workspace.dependencies]
-derive_more = { version = "1", features = ["display"] }
+derive_more = { version = "2", features = ["display"], default-features = false }
 tracing = "0.1"
-proc-macro2 = "1.0.74"
-quote = "1.0.35"
-error-stack = "0.5"
-syn = "2.0.46"
+proc-macro2 = "1.0.95"
+quote = "1.0.40"
+error-stack = "0.6.0"
+syn = "2.0.104"
 bigerror-derive = { path = "./bigerror_derive", version = "0.1.0" }
 
 [workspace.lints.clippy]

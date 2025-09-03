@@ -12,19 +12,33 @@ use alloc::{
 use derive_more as dm;
 pub use error_stack::{self, Context, Report, ResultExt};
 
+/// Trait alias for types that can be displayed and used in error attachments.
+///
+/// This trait combines `Display`, `Debug`, `Send`, `Sync`, and `'static` bounds
+/// for types that can be attached to error reports.
 pub trait Display: fmt::Display + fmt::Debug + Send + Sync + 'static {}
 
 impl<A> Display for A where A: fmt::Display + fmt::Debug + Send + Sync + 'static {}
 
+/// Trait alias for types that can be debug-formatted and used in error attachments.
+///
+/// This trait combines `Debug`, `Send`, `Sync`, and `'static` bounds for types
+/// that can be debug-formatted in error reports.
 pub trait Debug: fmt::Debug + Send + Sync + 'static {}
 
 impl<A> Debug for A where A: fmt::Debug + Send + Sync + 'static {}
 
-// used to wrap types that only implement `std::fmt::Debug`
+/// Wrapper for types that only implement `Debug` to make them displayable.
+///
+/// This wrapper allows debug-only types to be used where `Display` is required
+/// by formatting them using their `Debug` implementation.
 #[derive(Debug)]
 pub struct Dbg<A: Debug>(pub A);
 
 impl Dbg<String> {
+    /// Create a `Dbg<String>` by debug-formatting any type.
+    ///
+    /// This is a convenience method for wrapping debug-formatted values in a string.
     pub fn format(attachment: impl fmt::Debug) -> Self {
         Self(format!("{attachment:?}"))
     }
@@ -36,7 +50,10 @@ impl<A: Debug> fmt::Display for Dbg<A> {
     }
 }
 
-// simple key-value pair attachment
+/// A simple key-value pair attachment for error reports.
+///
+/// This type represents a key-value pair that can be attached to error reports
+/// for additional context information.
 #[derive(Debug, PartialEq, Eq)]
 pub struct KeyValue<K, V>(pub K, pub V);
 
@@ -46,7 +63,13 @@ impl<K: fmt::Display, V: fmt::Display> fmt::Display for KeyValue<K, V> {
     }
 }
 
+impl<C: Context> core::error::Error for KeyValue<Type, C> {}
+
 impl<K: Display, V: Debug> KeyValue<K, Dbg<V>> {
+    /// Create a key-value pair where the value is debug-formatted.
+    ///
+    /// This is a convenience method for creating key-value pairs where
+    /// the value only implements `Debug` but not `Display`.
     pub const fn dbg(key: K, value: V) -> Self {
         Self(key, Dbg(value))
     }
@@ -57,20 +80,24 @@ impl<K: Display, V: Debug> KeyValue<K, Dbg<V>> {
 #[macro_export]
 macro_rules! kv {
     (ty: $value: expr) => {
-        $crate::KeyValue($crate::Type::of_val(&$value), $value)
+        $crate::KeyValue($crate::Type::any(&$value), $value)
     };
     ($value: expr) => {
         $crate::KeyValue(stringify!($value), $value)
     };
 }
 
+/// Represents a field or property with its associated status.
+///
+/// Field differs from [`KeyValue`] in that the id/key points to a preexisting
+/// field, index, or property of a data structure. This is useful for indicating
+/// the status of specific fields in validation or processing contexts.
 #[derive(Debug)]
-// Field differs from [`KeyValue`] in that the id/key points to a preexisting [`Index`] or
-// [`Property`]
 pub struct Field<Id, S> {
-    // the identifiable property of a data structure
-    // such has  `hash_map["key"]` or a `struct.property`
+    /// The identifiable property of a data structure
+    /// such as `hash_map["key"]` or a `struct.property`
     id: Id,
+    /// The status or state of the field
     status: S,
 }
 
@@ -81,24 +108,34 @@ impl<Id: Display, S: Display> fmt::Display for Field<Id, S> {
 }
 
 impl<Id: Display, S: Display> Field<Id, S> {
+    /// Create a new field with the given identifier and status.
     pub const fn new(key: Id, status: S) -> Self {
         Self { id: key, status }
     }
 }
-/// wrapper attachment that is used to refer to the type of an object
-/// rather than the value
+/// Wrapper attachment that refers to the type of an object rather than its value.
+///
+/// This type is used to attach type information to error reports, which is useful
+/// for debugging type-related issues or showing what types were involved in an operation.
 #[derive(PartialEq, Eq)]
 pub struct Type(&'static str);
 
 impl Type {
-    // const fn when type_name is const fn in stable
+    /// Create a type attachment for the given type.
+    ///
+    /// This will be a const fn when `type_name` becomes const fn in stable Rust.
     #[must_use]
     pub fn of<T>() -> Self {
         Self(simple_type_name::<T>())
     }
 
+    /// Create a type attachment for the type of the given value.
     pub fn of_val<T: ?Sized>(_val: &T) -> Self {
         Self(simple_type_name::<T>())
+    }
+    /// Create a type attachment with a fully qualified URI
+    pub fn any<T: ?Sized>(_val: &T) -> Self {
+        Self(any::type_name::<T>())
     }
 }
 
@@ -121,28 +158,53 @@ macro_rules! ty {
     };
 }
 
+/// Status indicator for something that is already present.
+///
+/// This is commonly used in field status attachments to indicate
+/// that a field or value already exists when it shouldn't.
 #[derive(Debug, dm::Display)]
 #[display("already present")]
 pub struct AlreadyPresent;
 
+/// Status indicator for something that is missing.
+///
+/// This is commonly used in field status attachments to indicate
+/// that a required field or value is missing.
 #[derive(Debug, dm::Display)]
 #[display("missing")]
 pub struct Missing;
 
+/// Status indicator for something that is unsupported.
+///
+/// This is commonly used to indicate that a feature, operation,
+/// or value is not supported in the current context.
 #[derive(Debug, dm::Display)]
 #[display("unsupported")]
 pub struct Unsupported;
 
+/// Status indicator for something that is invalid.
+///
+/// This is commonly used in field status attachments to indicate
+/// that a field or value is invalid or malformed.
 #[derive(Debug, dm::Display)]
 #[display("invalid")]
 pub struct Invalid;
 
+/// Attachment that shows expected vs actual values.
+///
+/// This is useful for validation errors and mismatches where you want
+/// to clearly show what was expected versus what was actually received.
 #[derive(Debug)]
 pub struct Expectation<E, A> {
+    /// The expected value
     pub expected: E,
+    /// The actual value that was received
     pub actual: A,
 }
 
+/// Attachment that shows a conversion from one type to another.
+///
+/// This is useful for conversion errors to show the source and target types.
 #[derive(Debug)]
 pub struct FromTo<F, T>(pub F, pub T);
 
@@ -197,6 +259,10 @@ impl<F: Display, T: Display> fmt::Display for FromTo<F, T> {
     }
 }
 
+/// Wrapper for `Duration` that provides human-readable display formatting.
+///
+/// This wrapper converts duration values into a readable format like "1H30m45s"
+/// instead of the default debug representation.
 #[derive(Debug)]
 pub struct DisplayDuration(pub Duration);
 impl fmt::Display for DisplayDuration {
@@ -219,7 +285,14 @@ impl ops::Deref for DisplayDuration {
     }
 }
 
-/// convert a [`Duration`] into a "0H00m00s" string
+/// Convert a [`Duration`] into a human-readable "0H00m00s" format string.
+///
+/// This function formats durations in a compact, readable format:
+/// - Milliseconds: "123ms"
+/// - Seconds only: "00s"
+/// - Minutes and seconds: "05m30s"
+/// - Hours, minutes, and seconds: "02H15m30s"
+/// - Zero duration: "ZERO"
 #[must_use]
 pub fn hms_string(duration: Duration) -> String {
     if duration.is_zero() {
@@ -247,6 +320,19 @@ pub fn hms_string(duration: Duration) -> String {
     hms
 }
 
+/// Extract the simple name of a type, removing module paths.
+///
+/// This function returns just the type name without the full module path.
+/// For generic types like `Option<T>` or `Vec<T>`, it preserves the full
+/// generic syntax.
+///
+/// # Examples
+///
+/// ```
+/// # use bigerror::attachment::simple_type_name;
+/// assert_eq!(simple_type_name::<String>(), "String");
+/// assert_eq!(simple_type_name::<Option<i32>>(), "core::option::Option<i32>");
+/// ```
 #[must_use]
 pub fn simple_type_name<T: ?Sized>() -> &'static str {
     let full_type = any::type_name::<T>();
@@ -257,16 +343,19 @@ pub fn simple_type_name<T: ?Sized>() -> &'static str {
     full_type.rsplit_once("::").map_or(full_type, |t| t.1)
 }
 
-// this is meant to explicitly indicate
-// that the underlying `A` is being
-// used as an index key for getter methods in a collection
-// such as `HashMap` keys and `Vec` indices
+/// Wrapper that explicitly indicates a value is being used as an index key.
+///
+/// This wrapper is used to indicate that the underlying value is being used
+/// as an index key for getter methods in collections, such as `HashMap` keys
+/// and `Vec` indices. It helps distinguish between regular values and index keys
+/// in error messages.
 #[derive(Debug, dm::Display)]
 #[display("idx [{0}: {}]", simple_type_name::<I>())]
 pub struct Index<I: fmt::Display>(pub I);
 
 #[cfg(test)]
 mod test {
+
     use super::*;
 
     #[test]

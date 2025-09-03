@@ -1,3 +1,5 @@
+set unstable
+
 # Justfiles are processed by the just command runner (https://just.systems/).
 # You can install it with `brew install just` or `cargo install just`
 _default:
@@ -19,3 +21,14 @@ printerr test $PRINTERR="true":
 
 printerr-all $PRINTERR="true" $RUST_TEST_THREADS="1":
   @cargo test --lib -- --exact --nocapture
+
+# vendor only error-stack
+[script("nu")]
+vendor:
+  cargo vendor; ls ./vendor | where name != "error-stack" | each { rm -rf $in.name }
+
+# check all types of clippy carges
+check:
+  cargo check --all-features
+  cargo check --no-default-features
+  cargo check
