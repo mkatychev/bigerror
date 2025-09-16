@@ -14,7 +14,7 @@ derive_more = { version = "2", features = ["display"], default-features = false 
 tracing = "0.1"
 proc-macro2 = "1.0.101"
 quote = "1.0.40"
-error-stack = "0.6.0"
+error-stack = { version =  "0.6.0", default-features = false }
 syn = "2.0.106"
 bigerror-derive = { path = "./bigerror_derive", version = "0.1.0" }
 

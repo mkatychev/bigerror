@@ -1,6 +1,6 @@
 [package]
 name = "bigerror"
-version = "0.10.1"
+version = "0.10.2"
 edition.workspace = true
 description.workspace = true
 license.workspace = true
@@ -23,7 +23,7 @@ tracing = ["error-stack/tracing"]
 
 
 [dependencies]
-error-stack.workspace = true
+error-stack = { workspace = true, default-features = false }
 tracing = { workspace = true, optional = true, features = ["attributes"] }
 bigerror-derive.workspace = true
 derive_more.workspace = true
