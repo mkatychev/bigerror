@@ -106,11 +106,11 @@ where
     ///
     /// This is useful for lazy evaluation of expensive attachment computations.
     #[track_caller]
-    fn attach_lazy<A>(attach_lazy: impl FnOnce() -> A) -> Report<Self>
+    fn attach_with<A>(attachment: impl FnOnce() -> A) -> Report<Self>
     where
         A: Display,
     {
-        Report::new(Self::VALUE).attach(attach_lazy())
+        Report::new(Self::VALUE).attach(attachment())
     }
 
     /// Create an error report with a displayable attachment.
@@ -300,7 +300,7 @@ where
     {
         match self {
             Ok(t) => op(t),
-            Err(ctx) => Err(ctx.into_report().change_context(C2::VALUE)),
+            Err(e) => Err(IntoContext::into_ctx(e.into_report())),
         }
     }
 
@@ -313,7 +313,7 @@ where
     {
         match self {
             Ok(t) => Ok(op(t)),
-            Err(ctx) => Err(ctx.into_report().change_context(C2::VALUE)),
+            Err(e) => Err(IntoContext::into_ctx(e.into_report())),
         }
     }
 }
@@ -921,7 +921,7 @@ mod test {
         fn compare(mine: usize, other: usize) -> Result<(), Report<MyError>> {
             if other != mine {
                 return Err(InvalidInput::attach("expected my number!"))
-                    .attach_lazy(|| kv!(ty: other)) // <usize>: 3
+                    .attach_with(|| kv!(ty: other)) // <usize>: 3
                     .into_ctx();
             }
             Ok(())

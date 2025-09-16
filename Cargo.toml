@@ -1,16 +1,13 @@
 [workspace]
-members = [
-    "bigerror", "bigerror_derive",
-]
+members = ["bigerror", "bigerror_derive"]
 resolver = "2"
 
 [workspace.package]
-version = "0.10.0"
 edition = "2024"
 description = "handle big errors ¯\\_(ツ)_/¯"
 license = "MIT"
 documentation = "https://docs.rs/bigerror"
-repository = "https://github.com/knox-networks/bigerror"
+repository = "https://github.com/mkatychev/bigerror"
 
 [workspace.dependencies]
 derive_more = { version = "2", features = ["display"], default-features = false }

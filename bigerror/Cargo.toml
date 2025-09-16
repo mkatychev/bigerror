@@ -1,6 +1,6 @@
 [package]
 name = "bigerror"
-version.workspace = true
+version = "0.10.1"
 edition.workspace = true
 description.workspace = true
 license.workspace = true
