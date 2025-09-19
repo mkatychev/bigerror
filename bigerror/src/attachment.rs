@@ -35,6 +35,8 @@ impl<A> Debug for A where A: fmt::Debug + Send + Sync + 'static {}
 #[derive(Debug)]
 pub struct Dbg<A: Debug>(pub A);
 
+impl<A: Debug> core::error::Error for Dbg<A> {}
+
 impl Dbg<String> {
     /// Create a `Dbg<String>` by debug-formatting any type.
     ///
