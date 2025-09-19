@@ -66,6 +66,7 @@ impl<K: fmt::Display, V: fmt::Display> fmt::Display for KeyValue<K, V> {
 }
 
 impl<C: Context> core::error::Error for KeyValue<Type, C> {}
+impl<C: Context> core::error::Error for KeyValue<&'static str, C> {}
 
 impl<K: Display, V: Debug> KeyValue<K, Dbg<V>> {
     /// Create a key-value pair where the value is debug-formatted.
@@ -77,6 +78,12 @@ impl<K: Display, V: Debug> KeyValue<K, Dbg<V>> {
     }
 }
 
+impl<V: Display> KeyValue<&'static str, V> {
+    pub const fn __vk(value: V, key: &'static str) -> Self {
+        Self(key, value)
+    }
+}
+
 /// Allows one to quickly specify a [`KeyValue`] pair, optionally using a
 /// `ty:` prefix using the `$value` [`Type`] as the key
 #[macro_export]
@@ -84,8 +91,11 @@ macro_rules! kv {
     (ty: $value: expr) => {
         $crate::KeyValue($crate::Type::any(&$value), $value)
     };
-    ($value: expr) => {
-        $crate::KeyValue(stringify!($value), $value)
+    ($($body:tt)+) => {
+        $crate::__field!(
+            $crate::KeyValue::__vk |
+            $($body)+
+        )
     };
 }
 
@@ -375,5 +385,13 @@ mod test {
         assert_eq!(kv!(ty: foo), KeyValue(Type::of_val(&foo), 13));
         // ensure literal values are handled correctly
         assert_eq!(kv!(ty: 13), KeyValue(Type::of_val(&13), 13));
+    }
+
+    #[test]
+    fn kv_macro_field() {
+        let foo = "Foo";
+        let attachment = kv!(foo.to_owned());
+
+        assert_eq!(attachment, KeyValue("foo", String::from(foo)));
     }
 }

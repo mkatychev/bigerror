@@ -665,6 +665,10 @@ macro_rules! __field {
     ($fn:path, @[$($rf:tt)*] @[$($pre:expr)+], $field:ident $(.$method:ident())* ) => {
         $fn($($rf)*$($pre.)+ $field $(.$method())*, stringify!($field))
     };
+    // handle method calls with any arguments: .method(args...)
+    ($fn:path, @[$($rf:tt)*] @[$($pre:expr)+], $method:ident ( $($args:tt)* ) $(.$rest_method:ident())* ) => {
+        $fn($($rf)*$($pre.)+ $method ( $($args)* ) $(.$rest_method())*, stringify!($method))
+    };
     ($fn:path, @[$($rf:tt)*] @[$body:expr], $(.$method:ident())* ) => {
         $fn($($rf)*$body$(.$method())*, stringify!($body))
     };
@@ -688,6 +692,11 @@ macro_rules! __field {
     };
     ($fn:path | $field:ident) => {
         $fn($field, stringify!($field))
+    };
+
+    // handle expressions with method calls with parentheses (catch-all)
+    ($fn:path | $expr:expr) => {
+        $fn($expr, stringify!($expr))
     };
 }
 
@@ -874,6 +883,9 @@ mod test {
         assert_err!(my_field);
         // from field method
         let my_field = expect_field!(my_struct.%my_field());
+        assert_err!(my_field);
+        let my_field = my_struct.my_field;
+        let my_field = expect_field!(my_field.to_owned().to_owned());
         assert_err!(my_field);
     }
 
