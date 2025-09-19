@@ -656,58 +656,96 @@ impl<T> OptionReport<T> for Option<T> {
 
 #[macro_export]
 macro_rules! __field {
-    // === exits ===
-    // handle optional method calls: self.x.as_ref()
-    ($fn:path, @[$($rf:tt)*] @[$($pre:expr)+], % $field_method:ident() $(.$method:ident())* ) => {
-        $fn($($rf)*$($pre.)+ $field_method() $(.$method())*, stringify!($field_method))
+    (@ $field:literal &[$($ref:tt)*] var[$($var:tt)*] .fn[$($fn:tt)*]) => {
+        // EXIT: return a tuple
+        ($field, $($ref)*$($var)*$($fn)*)
     };
-    // handle optional method calls: self.x.as_ref()
-    ($fn:path, @[$($rf:tt)*] @[$($pre:expr)+], $field:ident $(.$method:ident())* ) => {
-        $fn($($rf)*$($pre.)+ $field $(.$method())*, stringify!($field))
+    (@ &[$($ref:tt)*] var[$($var:tt)+] .fn[$($fn:tt)*]) => {
+        // EXIT: return a tuple
+        (stringify!($($var)+), $($ref)*$($var)*$($fn)*)
     };
-    // handle method calls with any arguments: .method(args...)
-    ($fn:path, @[$($rf:tt)*] @[$($pre:expr)+], $method:ident ( $($args:tt)* ) $(.$rest_method:ident())* ) => {
-        $fn($($rf)*$($pre.)+ $method ( $($args)* ) $(.$rest_method())*, stringify!($method))
+    (& $($lifetime:lifetime)?
+        $($rest:tt)+ @ &[$($ref:tt)*] var[] .fn[]) => {
+        $crate::__field!(
+            $($rest)* @
+            &[$($ref)* /*add*/ &$($lifetime)? ]
+            var[]
+            .fn[]
+        )
     };
-    ($fn:path, @[$($rf:tt)*] @[$body:expr], $(.$method:ident())* ) => {
-        $fn($($rf)*$body$(.$method())*, stringify!($body))
+    (*
+        $($rest:tt)+ @ &[$($ref:tt)*] var[] .fn[]) => {
+        $crate::__field!(
+            $($rest)* @
+            &[$($ref)* /*add*/ * ]
+            var[]
+            .fn[]
+        )
+    };
+    ($var:ident
+        $($rest:tt)* @ &[$($ref:tt)*] var[] .fn[]) => {
+        $crate::__field!(
+            $($rest)* @
+            &[$($ref)*]
+            var[$var]
+            .fn[$($fn)*]
+        )
+    };
+    (% . $field:ident
+        $($rest:tt)* @ &[$($ref:tt)*] var[$($var:tt)*] .fn[$($fn:tt)*]) => {
+        $crate::__field!(
+            /*add*/ . $field
+            $($rest)* @
+            stringify!(/*add*/ $field)
+            &[$($ref)*]
+            var[$($var)*]
+            .fn[$($fn)*]
+        )
+    };
+    (. $method:ident($($args:expr,)* $($tail_arg:expr)? $(,)?)
+        $($rest:tt)* @ $($field:literal)? &[$($ref:tt)*] var[$($var:tt)*] .fn[$($fn:tt)*]) => {
+        $crate::__field!(
+            $($rest)* @
+            $($field)?
+            &[$($ref)*]
+            var[$($var)*]
+            .fn[$($fn)* /*add*/ . $method($($args,)* $($tail_arg)?) ]
+        )
     };
 
-    // === much TTs ===
-    ($fn:path, @[$($rf:tt)*] @[$($pre:expr)+], $field:ident . $($rest:tt)+) => {
-        $crate::__field!($fn, $($rf:tt)* @[$($pre)+ $field], $($rest)+)
-    };
-
-    // === entries ===
-    ($fn:path | &$body:ident . $($rest:tt)+) => {
-        $crate::__field!($fn, @[&] @[$body], $($rest)+)
-    };
-    ($fn:path | $body:ident . $($rest:tt)+) => {
-        $crate::__field!($fn, @[] @[$body], $($rest)+)
-    };
-
-    // simple cases
-    ($fn:path | &$field:ident) => {
-        $fn(&$field, stringify!($field))
-    };
-    ($fn:path | $field:ident) => {
-        $fn($field, stringify!($field))
-    };
-
-    // handle expressions with method calls with parentheses (catch-all)
-    ($fn:path | $expr:expr) => {
-        $fn($expr, stringify!($expr))
+    // ENTRYPOINT
+    ($body:tt) => {
+        $crate::__field!(
+            $body @
+            &[]
+            var[]
+            .fn[]
+        )
     };
 }
 
 #[macro_export]
 macro_rules! expect_field {
     ($($body:tt)+) => {
-        $crate::__field!(
-         $crate::OptionReport::expect_field |
-            $($body)+
-        )
+        {
+            let (__field, __expr)= $crate::__field!($($body)+);
+            $crate::OptionReport::expect_field(__expr, __field)
+        }
     };
+}
+#[cfg(test)]
+#[derive(Default)]
+struct MyStruct {
+    my_field: Option<()>,
+    _string: String,
+}
+
+#[cfg(test)]
+impl MyStruct {
+    fn __field<T>(_t: T, _field: &'static str) {}
+    const fn my_field(&self) -> Option<()> {
+        self.my_field
+    }
 }
 
 #[cfg(test)]
@@ -725,19 +763,6 @@ mod test {
     #[derive(ThinContext)]
     #[bigerror(crate)]
     pub struct MyError;
-
-    #[derive(Default)]
-    struct MyStruct {
-        my_field: Option<()>,
-        _string: String,
-    }
-
-    impl MyStruct {
-        fn __field<T>(_t: T, _field: &'static str) {}
-        const fn my_field(&self) -> Option<()> {
-            self.my_field
-        }
-    }
 
     macro_rules! assert_err {
         ($result:expr $(,)?) => {
@@ -892,7 +917,8 @@ mod test {
     // this is meant to be a compile time test of the `__field!` macro
     fn __field() {
         let my_struct = MyStruct::default();
-        __field!(MyStruct::__field::<&str> | &my_struct._string);
+        let (field, val) = __field!(&my_struct._string);
+        MyStruct::__field::<&str>(field, val);
     }
 
     #[test]
