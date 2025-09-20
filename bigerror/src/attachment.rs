@@ -78,12 +78,6 @@ impl<K: Display, V: Debug> KeyValue<K, Dbg<V>> {
     }
 }
 
-impl<V: Display> KeyValue<&'static str, V> {
-    pub const fn __vk(value: V, key: &'static str) -> Self {
-        Self(key, value)
-    }
-}
-
 /// Allows one to quickly specify a [`KeyValue`] pair, optionally using a
 /// `ty:` prefix using the `$value` [`Type`] as the key
 #[macro_export]
