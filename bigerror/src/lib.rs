@@ -317,8 +317,89 @@ where
 pub trait ReportAs<T> {
     /// Convert this result into a report with the specified context type.
     ///
-    /// This will wrap the error with additional context including the source
-    /// error chain and type information.
+    /// This method automatically converts any `Result<T, E>` where `E` implements
+    /// `Context + Error` into a `Result<T, Report<C>>` where `C` is your desired
+    /// context type. It preserves the complete error chain and adds type information
+    /// about the original error.
+    ///
+    /// # Benefits
+    ///
+    /// - **Automatic conversion** - No need for manual error wrapping
+    /// - **Source chain preservation** - Original error details are maintained
+    /// - **Type information** - Includes the original error type name
+    /// - **Ergonomic** - Works with `?` operator seamlessly
+    ///
+    /// # Examples
+    ///
+    /// ## Basic parsing errors
+    ///
+    /// ```
+    /// use bigerror::{ReportAs, ThinContext, Report};
+    ///
+    /// #[derive(bigerror::ThinContext)]
+    /// struct MyError;
+    ///
+    /// fn parse_number(s: &str) -> Result<i32, Report<MyError>> {
+    ///     s.parse().report_as() // Converts ParseIntError automatically
+    /// }
+    ///
+    /// let result = parse_number("not_a_number");
+    /// assert!(result.is_err());
+    /// // Error includes original ParseIntError details + type information
+    /// ```
+    ///
+    /// ## File operations
+    ///
+    /// ```
+    /// use bigerror::{ReportAs, ThinContext, Report};
+    ///
+    /// #[derive(bigerror::ThinContext)]
+    /// struct ConfigError;
+    ///
+    /// fn read_config() -> Result<String, Report<ConfigError>> {
+    ///     std::fs::read_to_string("config.txt").report_as()
+    /// }
+    ///
+    /// // If file doesn't exist, converts std::io::Error to Report<ConfigError>
+    /// ```
+    ///
+    /// ## Complex error chains
+    ///
+    /// ```
+    /// use bigerror::{ReportAs, ThinContext, Report};
+    ///
+    /// #[derive(bigerror::ThinContext)]
+    /// struct ProcessingError;
+    ///
+    /// fn process_data() -> Result<i32, Report<ProcessingError>> {
+    ///     let content = std::fs::read_to_string("data.txt").report_as()?;
+    ///     let number: i32 = content.trim().parse().report_as()?;
+    ///     Ok(number * 2)
+    /// }
+    ///
+    /// // Both I/O errors and parse errors are automatically converted
+    /// // while preserving the complete error chain
+    /// ```
+    ///
+    /// ## Comparison with manual conversion
+    ///
+    /// ```
+    /// use bigerror::{ReportAs, ThinContext, Report};
+    /// use error_stack::ResultExt;
+    ///
+    /// #[derive(bigerror::ThinContext)]
+    /// struct MyError;
+    ///
+    /// // With report_as() - concise and automatic
+    /// fn parse_easy(s: &str) -> Result<i32, Report<MyError>> {
+    ///     s.parse().report_as()
+    /// }
+    ///
+    /// // Manual approach - more verbose
+    /// fn parse_manual(s: &str) -> Result<i32, Report<MyError>> {
+    ///     s.parse().change_context(MyError)
+    /// }
+    /// ```
     fn report_as<C: ThinContext>(self) -> Result<T, Report<C>>;
 }
 
@@ -695,6 +776,65 @@ where
     Self: Sized,
 {
     /// Convert `None` into a `NotFound` error with type information.
+    ///
+    /// This method transforms an `Option<T>` into a `Result<T, Report<NotFound>>`,
+    /// automatically attaching the type information of `T` to provide context
+    /// about what was expected but not found.
+    ///
+    /// # Examples
+    ///
+    /// ## Basic usage with Option values
+    ///
+    /// ```
+    /// use bigerror::{OptionReport, NotFound, Report};
+    ///
+    /// let maybe_value: Option<String> = None;
+    /// let result: Result<String, Report<NotFound>> = maybe_value.expect_or();
+    /// assert!(result.is_err());
+    /// // Error will include type information: "<String> not found"
+    /// ```
+    ///
+    /// ## With Vec and collections
+    ///
+    /// ```
+    /// use bigerror::{OptionReport, NotFound, Report};
+    ///
+    /// let numbers = vec![1, 2, 3];
+    /// let result: Result<&i32, Report<NotFound>> = numbers.get(10).expect_or();
+    /// assert!(result.is_err());
+    /// // Error will show: "<&i32> not found"
+    /// ```
+    ///
+    /// ## Function return values
+    ///
+    /// ```
+    /// use bigerror::{OptionReport, NotFound, Report};
+    ///
+    /// fn find_user_by_id(id: u64) -> Result<User, Report<NotFound>> {
+    ///     // Simulate database lookup that might return None
+    ///     let user: Option<User> = None; // Database lookup result
+    ///     user.expect_or()
+    /// }
+    ///
+    /// # struct User { name: String }
+    /// let result = find_user_by_id(123);
+    /// assert!(result.is_err());
+    /// // Error will include: "<User> not found"
+    /// ```
+    ///
+    /// ## Chaining with other error handling
+    ///
+    /// ```
+    /// use bigerror::{OptionReport, IntoContext, ThinContext, Report};
+    ///
+    /// #[derive(bigerror::ThinContext)]
+    /// struct DatabaseError;
+    ///
+    /// fn get_config() -> Result<String, Report<DatabaseError>> {
+    ///     let config: Option<String> = None;
+    ///     config.expect_or().map_err(|e| e.into_ctx())
+    /// }
+    /// ```
     fn expect_or(self) -> Result<T, Report<NotFound>>;
     /// Convert `None` into a `NotFound` error with key-value context.
     fn expect_kv<K, V>(self, key: K, value: V) -> Result<T, Report<NotFound>>
