@@ -1,3 +1,119 @@
+//! Enhanced error handling library built on top of [`error-stack`].
+//!
+//! `bigerror` provides ergonomic error handling with rich context attachments, structured error
+//! types, and reduced boilerplate. It extends [`error-stack`] with convenient macros, traits,
+//! and pre-defined error contexts for common scenarios.
+//!
+//! # Key Features
+//!
+//! - **Zero-cost abstractions** - Built on [`error-stack`] with minimal overhead
+//! - **Rich context attachments** - Key-value pairs, field status, type information
+//! - **Ergonomic macros** - [`kv!`], [`ty!`], [`expect_field!`] for common patterns
+//! - **Pre-defined contexts** - [`NotFound`], [`ParseError`], [`Timeout`], etc.
+//! - **No-std support** - Works in embedded and constrained environments
+//! - **Automatic conversions** - [`From`] implementations and [`ReportAs`] trait
+//!
+//! # Quick Start
+//!
+//! ```rust
+//! use bigerror::{ThinContext, Report, kv, expect_field, ParseError, IntoContext};
+//!
+//! // Define your error type
+//! #[derive(bigerror::ThinContext)]
+//! struct MyError;
+//!
+//! fn parse_number(input: &str) -> Result<i32, Report<MyError>> {
+//!     // Use context conversion for error handling  
+//!     let num: i32 = input.parse()
+//!         .map_err(|e| ParseError::attach_kv("input", input.to_string()).into_ctx())?;
+//!     
+//!     Ok(num)
+//! }
+//!
+//! // Example with expect_field for optional values
+//! fn get_config_value() -> Result<&'static str, Report<MyError>> {
+//!     let config = Some("production");
+//!     expect_field!(config).map_err(|e| e.into_ctx())
+//! }
+//! ```
+//!
+//! # Core Concepts
+//!
+//! ## Error Contexts
+//!
+//! Error contexts represent different categories of errors. Use the [`ThinContext`] derive
+//! macro to create zero-sized error types:
+//!
+//! ```rust
+//! use bigerror::ThinContext;
+//!
+//! #[derive(ThinContext)]
+//! struct NetworkError;
+//!
+//! #[derive(ThinContext)]
+//! struct ValidationError;
+//! ```
+//!
+//! ## Attachments
+//!
+//! Attach contextual information to errors using various attachment types:
+//!
+//! ```rust
+//! use bigerror::{ThinContext, kv, ty};
+//!
+//! #[derive(ThinContext)]
+//! struct MyError;
+//!
+//! // Key-value attachments
+//! let error = MyError::attach_kv("user_id", 42);
+//!
+//! // Type-value attachments
+//! let data = vec![1, 2, 3];
+//! let error = MyError::attach_kv(ty!(Vec<i32>), data.len());
+//!
+//! // Using macros for convenience
+//! let username = "alice";
+//! let error = MyError::attach(kv!(username)); // "username": "alice"
+//! let error = MyError::attach(kv!(ty: username));  // <&str>: "alice"
+//! ```
+//!
+//! ## Conversion and Propagation
+//!
+//! Use [`ReportAs`] for automatic error conversion with context preservation:
+//!
+//! ```rust
+//! use bigerror::{ReportAs, ThinContext, Report};
+//!
+//! #[derive(ThinContext)]
+//! struct MyError;
+//!
+//! fn parse_number(s: &str) -> Result<i32, Report<MyError>> {
+//!     s.parse().report_as() // Automatically converts ParseIntError
+//! }
+//! ```
+//!
+//! # Feature Flags
+//!
+//! - `std` (default) - Standard library support
+//! - `backtrace` (default) - Backtrace support
+//! - `tracing` - Integration with the tracing ecosystem
+//! - `serde` - Serialization support
+//! - `anyhow` - Compatibility with anyhow
+//! - `eyre` - Compatibility with eyre
+//!
+//! # Pre-defined Error Contexts
+//!
+//! Common error contexts are provided out of the box:
+//!
+//! - [`NotFound`] - Missing resources, failed lookups
+//! - [`ParseError`] - Parsing and deserialization failures  
+//! - [`Timeout`] - Operations that exceed time limits
+//! - [`InvalidInput`] - Validation and input errors
+//! - [`ConversionError`] - Type conversion failures
+//! - [`IoError`] - I/O operation failures
+//!
+//! See the [`context`] module for the complete list.
+
 #![cfg_attr(not(feature = "std"), no_std)]
 #![expect(deprecated, reason = "We use `Context` to maintain compatibility")]
 
@@ -731,6 +847,71 @@ macro_rules! __field {
     };
 }
 
+/// Converts an `Option` to a `Result`, using the extracted field name for error context.
+///
+/// This macro extracts field names from expressions and uses them to create descriptive
+/// `NotFound` errors when the `Option` is `None`. It works with variable names, struct
+/// fields, method calls, and complex expressions.
+///
+/// # Examples
+///
+/// ## Basic field extraction
+///
+/// ```
+/// use bigerror::{expect_field, NotFound, Report};
+///
+/// struct User {
+///     email: Option<String>,
+/// }
+///
+/// let user = User { email: None };
+/// let result: Result<&String, Report<NotFound>> = expect_field!(user.email.as_ref());
+/// assert!(result.is_err());
+/// // Error will show: field "email" is missing
+/// ```
+///
+/// ## Method calls
+///
+/// ```
+/// use bigerror::{expect_field, NotFound, Report};
+///
+/// struct Config {
+///     token: Option<String>,
+/// }
+///
+/// impl Config {
+///     fn get_token(&self) -> Option<&str> {
+///         self.token.as_deref()
+///     }
+/// }
+///
+/// let config = Config { token: None };
+/// let result: Result<&str, Report<NotFound>> = expect_field!(config.%get_token());
+/// assert!(result.is_err());
+/// // Error will show: field "get_token" is missing
+/// ```
+///
+/// ## Variable extraction
+///
+/// ```
+/// use bigerror::{expect_field, NotFound, Report};
+///
+/// let session_id: Option<u64> = None;
+/// let result: Result<u64, Report<NotFound>> = expect_field!(session_id);
+/// assert!(result.is_err());
+/// // Error will show: field "session_id" is missing
+/// ```
+///
+/// ## Complex expressions
+///
+/// ```
+/// use bigerror::{expect_field, NotFound, Report};
+///
+/// let data: Option<Vec<String>> = Some(vec![]);
+/// let result: Result<&String, Report<NotFound>> = expect_field!(data.as_ref().and_then(|v| v.first()));
+/// assert!(result.is_err());
+/// // Error will show: field "data" is missing
+/// ```
 #[macro_export]
 macro_rules! expect_field {
     ($($body:tt)+) => {

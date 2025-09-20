@@ -30,3 +30,6 @@ derive_more.workspace = true
 
 [lints]
 workspace = true
+
+[package.metadata.docs.rs]
+cargo-args = ["-Zunstable-options", "-Zrustdoc-scrape-examples"]
