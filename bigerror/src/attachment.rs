@@ -91,9 +91,6 @@ macro_rules! kv {
     (ty: $value: expr) => {
         $crate::KeyValue($crate::Type::any(&$value), $value)
     };
-    ($value: expr) => {
-        $crate::KeyValue(stringify!($value), $value)
-    };
     ($($body:tt)+) => {
         {
             let (__key, __value)= $crate::__field!($($body)+);
@@ -393,29 +390,26 @@ mod test {
 
     #[test]
     fn kv_macro_var() {
-        // let foo = "Foo";
-        // let attachment = kv!(foo.to_owned());
-        //
-        // assert_eq!(attachment, KeyValue("foo", String::from(foo)));
+        let foo = "Foo";
+        let key_value = kv!(foo.to_owned());
+
+        assert_eq!(key_value, KeyValue("foo", String::from(foo)));
     }
 
     #[test]
     fn kv_macro_struct() {
-        // let my_struct = MyStruct {
-        //     my_field: None,
-        //     _string: String::from("Value"),
-        // };
-        //
-        // let attachment = kv!(my_struct._string);
-        // assert_eq!(attachment, KeyValue("_string", String::from("Value")));
-        // let my_field = expect_field!(my_struct.my_field);
-        // // from field method
-        // let my_field = expect_field!(my_struct.%my_field());
-        // assert_err!(my_field);
-        // let my_field = my_struct.my_field;
-        // let my_field = expect_field!(my_field.to_owned().to_owned());
-        // assert_err!(my_field);
-        //
-        // assert_eq!(attachment, KeyValue("foo", String::from(foo)));
+        let my_struct = MyStruct {
+            my_field: None,
+            _string: String::from("Value"),
+        };
+
+        let key_value = kv!(my_struct.%my_field());
+        assert_eq!(key_value, KeyValue("my_field", None));
+
+        let key_value = kv!(my_struct.%_string);
+        assert_eq!(key_value, KeyValue("_string", String::from("Value")));
+
+        let key_value = kv!(my_struct.my_field);
+        assert_eq!(key_value, KeyValue("my_struct.my_field", None));
     }
 }

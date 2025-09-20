@@ -656,78 +656,78 @@ impl<T> OptionReport<T> for Option<T> {
 
 #[macro_export]
 macro_rules! __field {
-    ({ } @$field:literal &[$($ref:tt)*] var[$($var:tt)+] .fn[$($fn:tt)*]) => {
+    ({ } @[$field:ident] ref[$($ref:tt)*] var[$($var:tt)+] fns[$($fn:tt)*]) => {
         // EXIT: return a tuple
-        ($field, $($ref)*$($var)*$($fn)*)
+        (stringify!($field), $($ref)*$($var)*$($fn)*)
     };
-    ({ } @ &[$($ref:tt)*] var[$($var:tt)+] .fn[$($fn:tt)*]) => {
+    ({ } @[] ref[$($ref:tt)*] var[$($var:tt)+] fns[$($fn:tt)*]) => {
         // EXIT: return a tuple
-        (stringify!($($var)+), $($ref)*$($var)*$($fn)*)
+        (concat!($(stringify!($var),)+), $($ref)*$($var)*$($fn)*)
     };
     ({ & $($lifetime:lifetime)? $($rest:tt)+ }
-        @ &[$($ref:tt)*] var[] .fn[]) => {
+        @[] ref[$($ref:tt)*] var[] fns[]) => {
         $crate::__field!(
             { $($rest)+ }
-            @
-            &[$($ref)* /*add*/ &$($lifetime)? ]
+            @[]
+            ref[$($ref)* /*add*/ &$($lifetime)? ]
             var[]
-            .fn[]
+            fns[]
         )
     };
     ({ * $($rest:tt)+ }
-        @ &[$($ref:tt)*] var[] .fn[]) => {
+        @[] ref[$($ref:tt)*] var[] fns[]) => {
         $crate::__field!(
             { $($rest)+ }
-            @
-            &[$($ref)* /*add*/ * ]
+            @[]
+            ref[$($ref)* /*add*/ * ]
             var[]
-            .fn[]
+            fns[]
         )
     };
-    ({ $var:ident $($rest:tt)* }
-        @ &[$($ref:tt)*] var[] .fn[]) => {
+    ({ . % $field:ident $($rest:tt)* }
+        @[] ref[$($ref:tt)*] var[$($var:tt)+] fns[$($fn:tt)*]) => {
+        $crate::__field!(
+            { /*add*/ . $field $($rest)* }
+            @[/*add*/ $field]
+            ref[$($ref)*]
+            var[$($var)+]
+            fns[$($fn)*]
+        )
+    };
+    ({. $method:ident($($arg:expr)? $(,$tail_args:expr)* ) $($rest:tt)* }
+        @[$($field:ident)?] ref[$($ref:tt)*] var[$($var:tt)*] fns[$($fn:tt)*]) => {
         $crate::__field!(
             { $($rest)* }
-            @
-            &[$($ref)*]
-            var[$var]
-            .fn[]
-        )
-    };
-    ({ .%$field:ident $($rest:tt)* }
-        @ &[$($ref:tt)*] var[$($var:tt)*] .fn[$($fn:tt)*]) => {
-        $crate::__field!(
-            { /*add*/ .$field $($rest)* }
-            @stringify!(/*add*/ $field)
-            &[$($ref)*]
+            @[$($field)?]
+            ref[$($ref)*]
             var[$($var)*]
-            .fn[$($fn)*]
-        )
-    };
-    ({ .$method:ident() $($rest:tt)* }
-        @ $($field:literal)? &[$($ref:tt)*] var[$($var:tt)*] .fn[$($fn:tt)*]) => {
-        $crate::__field!(
-            { $($rest)* }
-            @$($field)?
-            &[$($ref)*]
-            var[$($var)*]
-            .fn[$($fn)* /*add*/ . $method() ]
+            fns[$($fn)* /*add*/ . $method($($arg)? $(, $tail_args)*) ]
         )
     };
     ({ .$property:ident $($rest:tt)* }
-        @$($field:literal)? &[$($ref:tt)*] var[$($var:tt)*] .fn[$($fn:tt)*]) => {
+        @[$($field:ident)?] ref[$($ref:tt)*] var[$($var:tt)*] fns[$($fn:tt)*]) => {
         $crate::__field!(
             { $($rest)* }
-            @$($field)?
-            &[$($ref)*]
-            var[$($var)* /*add*/ . $property]
-            .fn[$($fn)*]
+            @[$($field)?]
+            ref[$($ref)*]
+            var[$($var)* /*add*/ .$property]
+            fns[$($fn)*]
+        )
+    };
+    ({ $var:ident $($rest:tt)* }
+        @[] ref[$($ref:tt)*] var[] fns[]) => {
+        $crate::__field!(
+            { $($rest)* }
+            @[]
+            ref[$($ref)*]
+            var[$var]
+            fns[]
         )
     };
 
     // ENTRYPOINT
     ($($body:tt)+) => {
-        $crate::__field!( { $body } @ &[] var[] .fn[])
+        $crate::__field!( { $($body)+ } @[] ref[] var[] fns[])
     };
 }
 
@@ -749,7 +749,7 @@ struct MyStruct {
 
 #[cfg(test)]
 impl MyStruct {
-    fn __field<T>(_t: T, property: &'static str) {}
+    fn __field<T>(_property: &'static str, _t: T) {}
     const fn my_field(&self) -> Option<()> {
         self.my_field
     }
@@ -911,10 +911,10 @@ mod test {
 
         let my_field = expect_field!(my_struct.my_field.as_ref());
         assert_err!(my_field);
-        let my_field = expect_field!(my_struct.%my_field);
+        let my_field = expect_field!(my_struct.my_field);
         assert_err!(my_field);
         // from field method
-        let my_field = expect_field!(my_struct.%my_field());
+        let my_field = expect_field!(*&my_struct.%my_field());
         assert_err!(my_field);
         let my_field = my_struct.my_field;
         let my_field = expect_field!(my_field.to_owned().to_owned());
@@ -924,7 +924,7 @@ mod test {
     // this is meant to be a compile time test of the `__field!` macro
     fn __field() {
         let my_struct = MyStruct::default();
-        let (field, val) = __field!(&my_struct._string);
+        let (field, val) = __field!(my_struct._string.as_ref());
         MyStruct::__field::<&str>(field, val);
     }
 
