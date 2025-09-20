@@ -23,10 +23,10 @@
 //! struct MyError;
 //!
 //! fn parse_number(input: &str) -> Result<i32, Report<MyError>> {
-//!     // Use context conversion for error handling  
+//!     // Use context conversion for error handling
 //!     let num: i32 = input.parse()
 //!         .map_err(|e| ParseError::attach_kv("input", input.to_string()).into_ctx())?;
-//!     
+//!
 //!     Ok(num)
 //! }
 //!
@@ -106,7 +106,7 @@
 //! Common error contexts are provided out of the box:
 //!
 //! - [`NotFound`] - Missing resources, failed lookups
-//! - [`ParseError`] - Parsing and deserialization failures  
+//! - [`ParseError`] - Parsing and deserialization failures
 //! - [`Timeout`] - Operations that exceed time limits
 //! - [`InvalidInput`] - Validation and input errors
 //! - [`ConversionError`] - Type conversion failures
@@ -827,7 +827,7 @@ where
     /// ```
     /// use bigerror::{OptionReport, IntoContext, ThinContext, Report};
     ///
-    /// #[derive(bigerror::ThinContext)]
+    /// #[derive(ThinContext)]
     /// struct DatabaseError;
     ///
     /// fn get_config() -> Result<String, Report<DatabaseError>> {
