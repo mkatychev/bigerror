@@ -81,7 +81,7 @@
 //! let error = MyError::attach(kv!(username.clone())); // "username": "alice"
 //!
 //! let username = Username(username);
-//! assert_eq!(format!("{}", kv!(ty: username)), "Username: alice");
+//! assert_eq!(format!("{}", kv!(ty: username)), "<Username>: alice");
 //! ```
 //!
 //! ## Conversion and Propagation

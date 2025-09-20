@@ -89,15 +89,15 @@ impl<K: Display, V: Debug> KeyValue<K, Dbg<V>> {
 /// ## Type-based key-value pairs
 ///
 /// ```
-/// use bigerror::{kv, KeyValue, ty};
+/// use bigerror::{kv, KeyValue, attachment::Type};
 ///
 /// let number = 42;
 /// let kv_pair = kv!(ty: number);
-/// assert_eq!(kv_pair, KeyValue(ty!(i32), 42));
+/// assert_eq!(kv_pair, KeyValue(Type::of_val(&number), 42));
 ///
 /// // Works with literals too
 /// let kv_literal = kv!(ty: "hello");
-/// assert_eq!(kv_literal, KeyValue(ty!(&str), "hello"));
+/// assert_eq!(kv_literal, KeyValue(Type::of_val(&"hello"), "hello"));
 /// ```
 ///
 /// ## Field/variable extraction
@@ -132,10 +132,10 @@ impl<K: Display, V: Debug> KeyValue<K, Dbg<V>> {
 #[macro_export]
 macro_rules! kv {
     (ty: $value: expr) => {
-        $crate::KeyValue($crate::Type::of(&$value), $value)
+        $crate::KeyValue($crate::attachment::Type::of_val(&$value), $value)
     };
     (type: $value: expr) => {
-        $crate::KeyValue($crate::Type::any(&$value), $value)
+        $crate::KeyValue($crate::Type::any_val(&$value), $value)
     };
     ($($body:tt)+) => {
         {
@@ -187,12 +187,17 @@ impl Type {
         Self(simple_type_name::<T>())
     }
 
+    #[must_use]
+    pub fn any<T>() -> Self {
+        Self(any::type_name::<T>())
+    }
+
     /// Create a type attachment for the type of the given value.
     pub fn of_val<T: ?Sized>(_val: &T) -> Self {
         Self(simple_type_name::<T>())
     }
     /// Create a type attachment with a fully qualified URI
-    pub fn any<T: ?Sized>(_val: &T) -> Self {
+    pub fn any_val<T: ?Sized>(_val: &T) -> Self {
         Self(any::type_name::<T>())
     }
 }
@@ -270,7 +275,10 @@ impl fmt::Debug for Type {
 #[macro_export]
 macro_rules! ty {
     ($type:ty) => {
-        $crate::attachment::Type::of::<$type>()
+        $crate::Type::of::<$type>()
+    };
+    (full: $type:ty) => {
+        $crate::Type::full::<$type>()
     };
 }
 
