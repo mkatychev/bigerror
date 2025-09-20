@@ -1,22 +1,19 @@
 //! Enhanced error handling library built on top of [`error-stack`].
 //!
-//! `bigerror` provides ergonomic error handling with rich context attachments, structured error
-//! types, and reduced boilerplate. It extends [`error-stack`] with convenient macros, traits,
-//! and pre-defined error contexts for common scenarios.
+//! `bigerror` provides ergonomic error handling adding out of the box functionality to [`error-stack`]
+//! for common scenarios.
 //!
 //! # Key Features
 //!
-//! - **Zero-cost abstractions** - Built on [`error-stack`] with minimal overhead
-//! - **Rich context attachments** - Key-value pairs, field status, type information
-//! - **Ergonomic macros** - [`kv!`], [`ty!`], [`expect_field!`] for common patterns
-//! - **Pre-defined contexts** - [`NotFound`], [`ParseError`], [`Timeout`], etc.
-//! - **No-std support** - Works in embedded and constrained environments
-//! - **Automatic conversions** - [`From`] implementations and [`ReportAs`] trait
+//! - **Useful context attachments** - Key-value pairs, field status, type information
+//!   - see [`kv!`], [`ty!`], [`expect_field!`]
+//! - **Pre-defined contexts**: [`NotFound`], [`ParseError`], [`Timeout`], etc.
+//! - **`no_std` support**: Works in embedded and constrained environments
 //!
 //! # Quick Start
 //!
 //! ```rust
-//! use bigerror::{ThinContext, Report, kv, expect_field, ParseError, IntoContext};
+//! use bigerror::{ThinContext, Report, kv, expect_field, ParseError, IntoContext, ResultIntoContext, NotFound};
 //!
 //! // Define your error type
 //! #[derive(ThinContext)]
@@ -25,15 +22,15 @@
 //! fn parse_number(input: &str) -> Result<i32, Report<MyError>> {
 //!     // Use context conversion for error handling
 //!     let num: i32 = input.parse()
-//!         .map_err(|e| ParseError::attach_kv("input", input.to_string()).into_ctx())?;
+//!         .into_ctx::<MyError>()?; // `::<MyError>` can be omitted
 //!
 //!     Ok(num)
 //! }
 //!
-//! // Example with expect_field for optional values
-//! fn get_config_value() -> Result<&'static str, Report<MyError>> {
+//! // Example with `expect_field` for optional values
+//! fn get_config_value() -> Result<&'static str, Report<NotFound>> {
 //!     let config = Some("production");
-//!     expect_field!(config).map_err(|e| e.into_ctx())
+//!     expect_field!(config).into_ctx()
 //! }
 //! ```
 //!
@@ -110,7 +107,6 @@
 //! - [`Timeout`] - Operations that exceed time limits
 //! - [`InvalidInput`] - Validation and input errors
 //! - [`ConversionError`] - Type conversion failures
-//! - [`IoError`] - I/O operation failures
 //!
 //! See the [`context`] module for the complete list.
 
@@ -322,13 +318,6 @@ pub trait ReportAs<T> {
     /// context type. It preserves the complete error chain and adds type information
     /// about the original error.
     ///
-    /// # Benefits
-    ///
-    /// - **Automatic conversion** - No need for manual error wrapping
-    /// - **Source chain preservation** - Original error details are maintained
-    /// - **Type information** - Includes the original error type name
-    /// - **Ergonomic** - Works with `?` operator seamlessly
-    ///
     /// # Examples
     ///
     /// ## Basic parsing errors
@@ -384,18 +373,17 @@ pub trait ReportAs<T> {
     /// ## Comparison with manual conversion
     ///
     /// ```
-    /// use bigerror::{ReportAs, ThinContext, Report};
-    /// use error_stack::ResultExt;
+    /// use bigerror::{ReportAs, ThinContext, Report, ResultExt};
     ///
     /// #[derive(ThinContext)]
     /// struct MyError;
     ///
-    /// // With report_as() - concise and automatic
+    /// // With report_as()
     /// fn parse_easy(s: &str) -> Result<i32, Report<MyError>> {
     ///     s.parse().report_as()
     /// }
     ///
-    /// // Manual approach - more verbose
+    /// // Manual approach
     /// fn parse_manual(s: &str) -> Result<i32, Report<MyError>> {
     ///     s.parse().change_context(MyError)
     /// }
@@ -443,14 +431,8 @@ pub trait IntoContext {
     /// This method transforms a `Report<C1>` into a `Report<C2>`, changing the context
     /// type while preserving all attachments and error information. When the source and
     /// target context types are the same, an optimized conversion preserves the original
-    /// error structure.
-    ///
-    /// # Performance
-    ///
-    /// - **Same type optimization** - When converting to the same context type, only
-    ///   adds a location marker without rebuilding the error chain
-    /// - **Different types** - Uses `change_context()` to properly convert between types
-    /// - **Zero-cost for same types** - Compile-time type checking enables optimizations
+    /// error structure. When converting to the same context type, only attaches a location marker without
+    /// adding to context.
     ///
     /// # Examples
     ///
@@ -478,7 +460,7 @@ pub trait IntoContext {
     /// ## Chaining error contexts in complex operations
     ///
     /// ```
-    /// use bigerror::{IntoContext, ThinContext, Report, NotFound};
+    /// use bigerror::{IntoContext, ThinContext, Report, NotFound, ResultIntoContext};
     ///
     /// #[derive(ThinContext)]
     /// struct DatabaseError;
@@ -493,9 +475,9 @@ pub trait IntoContext {
     ///
     ///     // Convert NotFound to DatabaseError, then to ServiceError
     ///     let database_result: Result<String, Report<DatabaseError>> =
-    ///         db_result.map_err(|e| e.into_ctx());
+    ///         db_result.into_ctx();
     ///
-    ///     database_result.map_err(|e| e.into_ctx())
+    ///     database_result.into_ctx()
     /// }
     /// ```
     ///
@@ -520,7 +502,7 @@ pub trait IntoContext {
     /// ## Error propagation with context changes
     ///
     /// ```
-    /// use bigerror::{IntoContext, ThinContext, Report, ParseError};
+    /// use bigerror::{IntoContext, ThinContext, Report, ParseError, ResultIntoContext};
     ///
     /// #[derive(ThinContext)]
     /// struct ConfigError;
@@ -529,11 +511,11 @@ pub trait IntoContext {
     /// struct AppError;
     ///
     /// fn load_config() -> Result<i32, Report<ConfigError>> {
-    ///     "42".parse().map_err(|e| ParseError::attach("config parsing").into_ctx())
+    ///     "42".parse().into_ctx::<ConfigError>()
     /// }
     ///
     /// fn start_app() -> Result<(), Report<AppError>> {
-    ///     let config = load_config().map_err(|e| e.into_ctx())?;
+    ///     let config = load_config().into_ctx()?;
     ///     // Use config...
     ///     Ok(())
     /// }
@@ -810,14 +792,14 @@ pub trait AttachExt {
     /// ## File operation context
     ///
     /// ```
-    /// use bigerror::{AttachExt, ThinContext, Report};
+    /// use bigerror::{AttachExt, ThinContext, Report, ResultIntoContext};
     ///
     /// #[derive(ThinContext)]
     /// struct FileError;
     ///
     /// fn read_config_file() -> Result<String, Report<FileError>> {
     ///     std::fs::read_to_string("config.toml")
-    ///         .map_err(|e| FileError::attach("failed to read config"))
+    ///         .into_ctx::<FileError>()
     ///         .attach_kv("file_path", "config.toml")
     ///         .attach_kv("operation", "read")
     /// }
@@ -898,7 +880,7 @@ pub trait AttachExt {
     /// ## Error chain with debug context
     ///
     /// ```
-    /// use bigerror::{AttachExt, ThinContext, Report};
+    /// use bigerror::{AttachExt, ThinContext, Report, ResultIntoContext};
     ///
     /// #[derive(ThinContext)]
     /// struct ParseError;
@@ -908,8 +890,8 @@ pub trait AttachExt {
     ///     input.iter()
     ///         .map(|s| s.parse::<i32>())
     ///         .collect::<Result<Vec<_>, _>>()
-    ///         .map_err(|e| ParseError::attach("number parsing failed")
-    ///             .attach_kv_dbg("input_data", input_owned)) // Debug format the input vector
+    ///         .into_ctx::<ParseError>()
+    ///         .attach_kv_dbg("input_data", input_owned) // Debug format the input vector
     /// }
     /// ```
     #[must_use]
@@ -1158,7 +1140,7 @@ pub trait AttachExt {
     /// ## File operation errors
     ///
     /// ```
-    /// use bigerror::{AttachExt, ThinContext, Report};
+    /// use bigerror::{AttachExt, ThinContext, Report, ResultIntoContext};
     /// use std::path::Path;
     ///
     /// #[derive(ThinContext)]
@@ -1166,7 +1148,7 @@ pub trait AttachExt {
     ///
     /// fn read_config_file<P: AsRef<Path>>(path: P) -> Result<String, Report<FileError>> {
     ///     std::fs::read_to_string(&path)
-    ///         .map_err(|e| FileError::attach("failed to read file"))
+    ///         .into_ctx::<FileError>()
     ///         .attach_path(path) // Attaches "path: /etc/config.toml"
     /// }
     /// ```
@@ -1174,7 +1156,7 @@ pub trait AttachExt {
     /// ## Directory operations
     ///
     /// ```
-    /// use bigerror::{AttachExt, ThinContext, Report};
+    /// use bigerror::{AttachExt, ThinContext, Report, ResultIntoContext};
     /// use std::path::PathBuf;
     ///
     /// #[derive(ThinContext)]
@@ -1182,7 +1164,7 @@ pub trait AttachExt {
     ///
     /// fn create_directory(dir_path: PathBuf) -> Result<(), Report<DirectoryError>> {
     ///     std::fs::create_dir_all(&dir_path)
-    ///         .map_err(|e| DirectoryError::attach("failed to create directory"))
+    ///         .into_ctx::<DirectoryError>()
     ///         .attach_path(dir_path) // Attaches the directory path
     /// }
     /// ```
@@ -1190,7 +1172,7 @@ pub trait AttachExt {
     /// ## Multiple file operations
     ///
     /// ```
-    /// use bigerror::{AttachExt, ThinContext, Report};
+    /// use bigerror::{AttachExt, ThinContext, Report, ResultIntoContext};
     /// use std::path::Path;
     ///
     /// #[derive(ThinContext)]
@@ -1199,12 +1181,12 @@ pub trait AttachExt {
     /// fn backup_file(source: &Path, dest: &Path) -> Result<(), Report<BackupError>> {
     ///     // Read source file
     ///     let content = std::fs::read_to_string(source)
-    ///         .map_err(|e| BackupError::attach("failed to read source"))
+    ///         .into_ctx::<BackupError>()
     ///         .attach_path(source)?;
     ///
     ///     // Write to destination
     ///     std::fs::write(dest, content)
-    ///         .map_err(|e| BackupError::attach("failed to write backup"))
+    ///         .into_ctx::<BackupError>()
     ///         .attach_path(dest)?;
     ///
     ///     Ok(())
@@ -1214,7 +1196,7 @@ pub trait AttachExt {
     /// ## Recommended usage pattern
     ///
     /// ```
-    /// use bigerror::{AttachExt, ThinContext, Report};
+    /// use bigerror::{AttachExt, ThinContext, Report, ResultIntoContext};
     /// use std::path::Path;
     ///
     /// #[derive(ThinContext)]
@@ -1223,7 +1205,8 @@ pub trait AttachExt {
     /// fn process_file(path: &Path) -> Result<String, Report<IoError>> {
     ///     // Good: path conversion only happens if there's an error
     ///     std::fs::read_to_string(path)
-    ///         .map_err(|e| IoError::attach("file read failed").attach_path(path))
+    ///         .into_ctx::<IoError>()
+    ///         .attach_path(path)
     /// }
     /// ```
     #[must_use]
