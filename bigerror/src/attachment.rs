@@ -66,6 +66,7 @@ impl<K: fmt::Display, V: fmt::Display> fmt::Display for KeyValue<K, V> {
 }
 
 impl<C: Context> core::error::Error for KeyValue<Type, C> {}
+impl<C: Context> core::error::Error for KeyValue<&'static str, C> {}
 
 impl<K: Display, V: Debug> KeyValue<K, Dbg<V>> {
     /// Create a key-value pair where the value is debug-formatted.
@@ -77,15 +78,67 @@ impl<K: Display, V: Debug> KeyValue<K, Dbg<V>> {
     }
 }
 
-/// Allows one to quickly specify a [`KeyValue`] pair, optionally using a
-/// `ty:` prefix using the `$value` [`Type`] as the key
+/// Creates a [`KeyValue`] pair for error attachments with flexible key-value syntax.
+///
+/// This macro provides two forms:
+/// - `kv!(ty: value)` - Uses the type of `value` as the key
+/// - `kv!(expression)` - Extracts field/variable names from expressions
+///
+/// # Examples
+///
+/// ## Type-based key-value pairs
+///
+/// ```
+/// use bigerror::{kv, KeyValue, ty};
+///
+/// let number = 42;
+/// let kv_pair = kv!(ty: number);
+/// assert_eq!(kv_pair, KeyValue(ty!(i32), 42));
+///
+/// // Works with literals too
+/// let kv_literal = kv!(ty: "hello");
+/// assert_eq!(kv_literal, KeyValue(ty!(&str), "hello"));
+/// ```
+///
+/// ## Field/variable extraction
+///
+/// ```
+/// use bigerror::{kv, KeyValue};
+///
+/// let username = "alice";
+/// let kv_var = kv!(username);
+/// assert_eq!(kv_var, KeyValue("username", "alice"));
+///
+/// struct User { name: String }
+/// let user = User { name: "bob".to_string() };
+/// let kv_field = kv!(user.name);
+/// assert_eq!(kv_field, KeyValue("user.name", "bob".to_string()));
+/// ```
+///
+/// ## Method calls and complex expressions
+///
+/// ```
+/// use bigerror::{kv, KeyValue};
+///
+/// struct Config { debug: bool }
+/// impl Config {
+///     fn is_debug(&self) -> bool { self.debug }
+/// }
+///
+/// let config = Config { debug: true };
+/// let kv_method = kv!(config.%is_debug());
+/// assert_eq!(kv_method, KeyValue("is_debug", true));
+/// ```
 #[macro_export]
 macro_rules! kv {
     (ty: $value: expr) => {
         $crate::KeyValue($crate::Type::any(&$value), $value)
     };
-    ($value: expr) => {
-        $crate::KeyValue(stringify!($value), $value)
+    ($($body:tt)+) => {
+        {
+            let (__key, __value)= $crate::__field!($($body)+);
+            $crate::KeyValue(__key, __value)
+        }
     };
 }
 
@@ -153,6 +206,64 @@ impl fmt::Debug for Type {
     }
 }
 
+/// Creates a [`Type`] attachment for the specified type.
+///
+/// This macro provides a convenient way to create type attachments for error reports.
+/// The type attachment shows the type name in error messages, which is useful for
+/// debugging type-related issues or showing what types were involved in an operation.
+///
+/// # Examples
+///
+/// ## Basic type attachments
+///
+/// ```
+/// use bigerror::{ty, attachment::Type};
+///
+/// // Create type attachments for built-in types
+/// let string_type = ty!(String);
+/// let int_type = ty!(i32);
+/// let vec_type = ty!(Vec<u8>);
+///
+/// // They display as <TypeName>
+/// assert_eq!(format!("{}", string_type), "<String>");
+/// assert_eq!(format!("{}", int_type), "<i32>");
+/// ```
+///
+/// ## Using with error attachments
+///
+/// ```
+/// use bigerror::{ty, ThinContext, NotFound};
+///
+/// #[derive(bigerror::ThinContext)]
+/// struct MyError;
+///
+/// // Attach type information to errors
+/// let error = MyError::attach(ty!(Vec<String>));
+/// ```
+///
+/// ## In key-value pairs
+///
+/// ```
+/// use bigerror::{ty, KeyValue};
+///
+/// // Use type as a key in key-value attachments
+/// let data = vec![1, 2, 3];
+/// let kv = KeyValue(ty!(Vec<i32>), data.len());
+/// assert_eq!(format!("{}", kv), "<alloc::vec::Vec<i32>>: 3");
+/// ```
+///
+/// ## Custom types
+///
+/// ```
+/// use bigerror::ty;
+///
+/// struct CustomStruct {
+///     field: String,
+/// }
+///
+/// let custom_type = ty!(CustomStruct);
+/// // Will show the full module path in the type name
+/// ```
 #[macro_export]
 macro_rules! ty {
     ($type:ty) => {
@@ -359,6 +470,7 @@ pub struct Index<I: fmt::Display>(pub I);
 mod test {
 
     use super::*;
+    use crate::MyStruct;
 
     #[test]
     fn kv_macro() {
@@ -375,5 +487,30 @@ mod test {
         assert_eq!(kv!(ty: foo), KeyValue(Type::of_val(&foo), 13));
         // ensure literal values are handled correctly
         assert_eq!(kv!(ty: 13), KeyValue(Type::of_val(&13), 13));
+    }
+
+    #[test]
+    fn kv_macro_var() {
+        let foo = "Foo";
+        let key_value = kv!(foo.to_owned());
+
+        assert_eq!(key_value, KeyValue("foo", String::from(foo)));
+    }
+
+    #[test]
+    fn kv_macro_struct() {
+        let my_struct = MyStruct {
+            my_field: None,
+            _string: String::from("Value"),
+        };
+
+        let key_value = kv!(my_struct.%my_field());
+        assert_eq!(key_value, KeyValue("my_field", None));
+
+        let key_value = kv!(my_struct.%_string);
+        assert_eq!(key_value, KeyValue("_string", String::from("Value")));
+
+        let key_value = kv!(my_struct.my_field);
+        assert_eq!(key_value, KeyValue("my_struct.my_field", None));
     }
 }

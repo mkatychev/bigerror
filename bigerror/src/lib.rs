@@ -1,3 +1,115 @@
+//! Enhanced error handling library built on top of [`error-stack`].
+//!
+//! `bigerror` provides ergonomic error handling adding out of the box functionality to [`error-stack`]
+//! for common scenarios.
+//!
+//! # Key Features
+//!
+//! - **Useful context attachments** - Key-value pairs, field status, type information
+//!   - see [`kv!`], [`ty!`], [`expect_field!`]
+//! - **Pre-defined contexts**: [`NotFound`], [`ParseError`], [`Timeout`], etc.
+//! - **`no_std` support**: Works in embedded and constrained environments
+//!
+//! # Quick Start
+//!
+//! ```rust
+//! use bigerror::{ThinContext, Report, kv, expect_field, ParseError, IntoContext, ResultIntoContext, NotFound};
+//!
+//! // Define your error type
+//! #[derive(ThinContext)]
+//! struct MyError;
+//!
+//! fn parse_number(input: &str) -> Result<i32, Report<MyError>> {
+//!     // Use context conversion for error handling
+//!     let num: i32 = input.parse()
+//!         .into_ctx::<MyError>()?; // `::<MyError>` can be omitted
+//!
+//!     Ok(num)
+//! }
+//!
+//! // Example with `expect_field` for optional values
+//! fn get_config_value() -> Result<&'static str, Report<NotFound>> {
+//!     let config = Some("production");
+//!     expect_field!(config).into_ctx()
+//! }
+//! ```
+//!
+//! # Core Concepts
+//!
+//! ## Error Contexts
+//!
+//! Error contexts represent different categories of errors. Use the [`ThinContext`] derive
+//! macro to create zero-sized error types:
+//!
+//! ```rust
+//! use bigerror::ThinContext;
+//!
+//! #[derive(ThinContext)]
+//! struct NetworkError;
+//!
+//! #[derive(ThinContext)]
+//! struct ValidationError;
+//! ```
+//!
+//! ## Attachments
+//!
+//! Attach contextual information to errors using various attachment types:
+//!
+//! ```rust
+//! use bigerror::{ThinContext, kv, ty};
+//!
+//! #[derive(ThinContext)]
+//! struct MyError;
+//!
+//! // Key-value attachments
+//! let error = MyError::attach_kv("user_id", 42);
+//!
+//! // Type-value attachments
+//! let data = vec![1, 2, 3];
+//! let error = MyError::attach_kv(ty!(Vec<i32>), data.len());
+//!
+//! // Using macros for convenience
+//! let username = "alice";
+//! let error = MyError::attach(kv!(username)); // "username": "alice"
+//! let error = MyError::attach(kv!(ty: username));  // <&str>: "alice"
+//! ```
+//!
+//! ## Conversion and Propagation
+//!
+//! Use [`ReportAs`] for automatic error conversion with context preservation:
+//!
+//! ```rust
+//! use bigerror::{ReportAs, ThinContext, Report};
+//!
+//! #[derive(ThinContext)]
+//! struct MyError;
+//!
+//! fn parse_number(s: &str) -> Result<i32, Report<MyError>> {
+//!     s.parse().report_as() // Automatically converts ParseIntError
+//! }
+//! ```
+//!
+//! # Feature Flags
+//!
+//! - `std` (default) - Standard library support
+//! - `backtrace` (default) - Backtrace support
+//! - `tracing` - Integration with the tracing ecosystem
+//! - `serde` - Serialization support
+//! - `anyhow` - Compatibility with anyhow
+//! - `eyre` - Compatibility with eyre
+//!
+//! # Pre-defined Error Contexts
+//!
+//! Common error contexts are provided out of the box:
+//!
+//! - [`NotFound`] - Missing resources, failed lookups
+//! - [`ParseError`] - Parsing and deserialization failures
+//! - [`Timeout`] - Operations that exceed time limits
+//! - [`InvalidInput`] - Validation and input errors
+//! - [`ConversionError`] - Type conversion failures
+//!
+//! See the [`context`] module for the complete list.
+
 #![cfg_attr(not(feature = "std"), no_std)]
 #![expect(deprecated, reason = "We use `Context` to maintain compatibility")]
 
@@ -81,7 +193,7 @@ pub fn init_no_ansi() {
 /// ```
 /// use bigerror::{ThinContext, Report};
 ///
-/// #[derive(bigerror::ThinContext)]
+/// #[derive(ThinContext)]
 /// pub struct MyError;
 ///
 /// // Create an error with an attachment
@@ -201,8 +313,81 @@ where
 pub trait ReportAs<T> {
     /// Convert this result into a report with the specified context type.
     ///
-    /// This will wrap the error with additional context including the source
-    /// error chain and type information.
+    /// This method automatically converts any `Result<T, E>` where `E` implements
+    /// `Context + Error` into a `Result<T, Report<C>>` where `C` is your desired
+    /// context type. It preserves the complete error chain and adds type information
+    /// about the original error.
+    ///
+    /// # Examples
+    ///
+    /// ## Basic parsing errors
+    ///
+    /// ```
+    /// use bigerror::{ReportAs, ThinContext, Report};
+    ///
+    /// #[derive(ThinContext)]
+    /// struct MyError;
+    ///
+    /// fn parse_number(s: &str) -> Result<i32, Report<MyError>> {
+    ///     s.parse().report_as() // Converts ParseIntError automatically
+    /// }
+    ///
+    /// let result = parse_number("not_a_number");
+    /// assert!(result.is_err());
+    /// // Error includes original ParseIntError details + type information
+    /// ```
+    ///
+    /// ## File operations
+    ///
+    /// ```
+    /// use bigerror::{ReportAs, ThinContext, Report};
+    ///
+    /// #[derive(ThinContext)]
+    /// struct ConfigError;
+    ///
+    /// fn read_config() -> Result<String, Report<ConfigError>> {
+    ///     std::fs::read_to_string("config.txt").report_as()
+    /// }
+    ///
+    /// // If file doesn't exist, converts std::io::Error to Report<ConfigError>
+    /// ```
+    ///
+    /// ## Complex error chains
+    ///
+    /// ```
+    /// use bigerror::{ReportAs, ThinContext, Report};
+    ///
+    /// #[derive(ThinContext)]
+    /// struct ProcessingError;
+    ///
+    /// fn process_data() -> Result<i32, Report<ProcessingError>> {
+    ///     let content = std::fs::read_to_string("data.txt").report_as()?;
+    ///     let number: i32 = content.trim().parse().report_as()?;
+    ///     Ok(number * 2)
+    /// }
+    ///
+    /// // Both I/O errors and parse errors are automatically converted
+    /// // while preserving the complete error chain
+    /// ```
+    ///
+    /// ## Comparison with manual conversion
+    ///
+    /// ```
+    /// use bigerror::{ReportAs, ThinContext, Report, ResultExt};
+    ///
+    /// #[derive(ThinContext)]
+    /// struct MyError;
+    ///
+    /// // With report_as()
+    /// fn parse_easy(s: &str) -> Result<i32, Report<MyError>> {
+    ///     s.parse().report_as()
+    /// }
+    ///
+    /// // Manual approach
+    /// fn parse_manual(s: &str) -> Result<i32, Report<MyError>> {
+    ///     s.parse().change_context(MyError)
+    /// }
+    /// ```
     fn report_as<C: ThinContext>(self) -> Result<T, Report<C>>;
 }
 
@@ -222,6 +407,9 @@ impl<T, E: Context + core::error::Error> ReportAs<T> for Result<T, E> {
                 let mut child_errs = vec![];
                 while let Some(child_err) = curr_source {
                     let new_err = format!("{child_err}");
+                    // workaround comparison when the there is an
+                    // error with a transparent inner type to avoid attaching
+                    // the same message twice
                     if Some(&new_err) != child_errs.last() {
                         child_errs.push(new_err);
                     }
@@ -240,8 +428,98 @@ impl<T, E: Context + core::error::Error> ReportAs<T> for Result<T, E> {
 pub trait IntoContext {
     /// Convert this error report to use a different context type.
     ///
-    /// If the source and target context types are the same, this will perform
-    /// an optimized conversion that preserves the original error structure.
+    /// This method transforms a `Report<C1>` into a `Report<C2>`, changing the context
+    /// type while preserving all attachments and error information. When the source and
+    /// target context types are the same, an optimized conversion preserves the original
+    /// error structure. When converting to the same context type, only attaches a location marker without
+    /// adding to context.
+    ///
+    /// # Examples
+    ///
+    /// ## Converting between different error contexts
+    ///
+    /// ```
+    /// use bigerror::{IntoContext, ThinContext, Report, ParseError, ResultIntoContext, ResultExt, InvalidInput};
+    ///
+    /// #[derive(ThinContext)]
+    /// struct NetworkError;
+    ///
+    /// #[derive(ThinContext)]
+    /// struct ApplicationError;
+    ///
+    /// fn process_response() -> Result<i32, Report<ApplicationError>> {
+    ///     // Start with a ParseError context
+    ///     let parse_result: Result<i32, Report<ParseError>> =
+    ///         "invalid".parse().into_ctx().attach(InvalidInput);
+    ///
+    ///     // Convert to ApplicationError context
+    ///     parse_result.into_ctx()
+    /// }
+    /// ```
+    ///
+    /// ## Chaining error contexts in complex operations
+    ///
+    /// ```
+    /// use bigerror::{IntoContext, ThinContext, Report, NotFound, ResultIntoContext};
+    ///
+    /// #[derive(ThinContext)]
+    /// struct DatabaseError;
+    ///
+    /// #[derive(ThinContext)]
+    /// struct ServiceError;
+    ///
+    /// fn fetch_user_data() -> Result<String, Report<ServiceError>> {
+    ///     // Simulate database operation that returns NotFound
+    ///     let db_result: Result<String, Report<NotFound>> =
+    ///         Err(NotFound::attach_kv("user_id", 123));
+    ///
+    ///     // Convert NotFound to DatabaseError, then to ServiceError
+    ///     let database_result: Result<String, Report<DatabaseError>> =
+    ///         db_result.into_ctx();
+    ///
+    ///     database_result.into_ctx()
+    /// }
+    /// ```
+    ///
+    /// ## Same-type conversion (optimized path)
+    ///
+    /// ```
+    /// use bigerror::{IntoContext, ThinContext, Report};
+    ///
+    /// #[derive(ThinContext)]
+    /// struct MyError;
+    ///
+    /// fn optimized_conversion() -> Result<(), Report<MyError>> {
+    ///     let error: Report<MyError> = MyError::attach("original error");
+    ///
+    ///     // This conversion is optimized since both types are MyError
+    ///     let converted: Report<MyError> = error.into_ctx();
+    ///
+    ///     Err(converted)
+    /// }
+    /// ```
+    ///
+    /// ## Error propagation with context changes
+    ///
+    /// ```
+    /// use bigerror::{IntoContext, ThinContext, Report, ParseError, ResultIntoContext};
+    ///
+    /// #[derive(ThinContext)]
+    /// struct ConfigError;
+    ///
+    /// #[derive(ThinContext)]
+    /// struct AppError;
+    ///
+    /// fn load_config() -> Result<i32, Report<ConfigError>> {
+    ///     "42".parse().into_ctx::<ConfigError>()
+    /// }
+    ///
+    /// fn start_app() -> Result<(), Report<AppError>> {
+    ///     let config = load_config().into_ctx()?;
+    ///     // Use config...
+    ///     Ok(())
+    /// }
+    /// ```
     fn into_ctx<C2: ThinContext>(self) -> Report<C2>;
 }
 
@@ -262,15 +540,175 @@ impl<C: 'static> IntoContext for Report<C> {
 /// Extension trait for `Result<T, Report<C>>` that provides context conversion methods.
 pub trait ResultIntoContext: ResultExt {
     /// Convert the error context type of this result.
+    ///
+    /// This method transforms a `Result<T, E>` into a `Result<T, Report<C2>>`, converting
+    /// any error type into a report with the specified context. It preserves success values
+    /// unchanged while converting errors through the [`IntoReport`] and [`IntoContext`] chain.
+    ///
+    /// # Examples
+    ///
+    /// ## Basic error context conversion
+    ///
+    /// ```
+    /// use bigerror::{ResultIntoContext, ThinContext, Report};
+    ///
+    /// #[derive(ThinContext)]
+    /// struct MyError;
+    ///
+    /// fn parse_data() -> Result<i32, Report<MyError>> {
+    ///     "42".parse().into_ctx() // Converts ParseIntError to Report<MyError>
+    /// }
+    ///
+    /// assert_eq!(parse_data().unwrap(), 42);
+    /// ```
+    ///
+    /// ## Chaining multiple operations with context conversion
+    ///
+    /// ```
+    /// use bigerror::{ResultIntoContext, ThinContext, Report};
+    ///
+    /// #[derive(ThinContext)]
+    /// struct ProcessingError;
+    ///
+    /// fn process_file() -> Result<i32, Report<ProcessingError>> {
+    ///     let content = std::fs::read_to_string("data.txt").into_ctx()?;
+    ///     let number: i32 = content.trim().parse().into_ctx()?;
+    ///     Ok(number * 2)
+    /// }
+    /// ```
     fn into_ctx<C2: ThinContext>(self) -> Result<Self::Ok, Report<C2>>;
 
     /// Chain operations while converting error context (similar to `Result::and_then`).
+    ///
+    /// This method allows you to chain operations that might fail, automatically converting
+    /// any errors from the current result to the target context type before passing the
+    /// success value to the closure. This is equivalent to `Result::and_then` but with
+    /// automatic error context conversion.
+    ///
+    /// # Examples
+    ///
+    /// ## Chaining operations with different error contexts
+    ///
+    /// ```
+    /// use bigerror::{ResultIntoContext, ThinContext, Report, IntoContext};
+    ///
+    /// #[derive(ThinContext)]
+    /// struct ValidationError;
+    ///
+    /// #[derive(ThinContext)]
+    /// struct ProcessingError;
+    ///
+    /// fn validate_and_process(input: &str) -> Result<i32, Report<ProcessingError>> {
+    ///     // First operation returns Result<i32, ParseIntError>
+    ///     input.parse::<i32>()
+    ///         .into_ctx::<ProcessingError>() // Convert to Result<i32, Report<ProcessingError>>
+    ///         .and_then_ctx(|num| {
+    ///             // Second operation that might fail with ValidationError
+    ///             if num > 0 {
+    ///                 Ok(num * 2)
+    ///             } else {
+    ///                 Err(ValidationError::attach("must be positive").into_ctx())
+    ///             }
+    ///         })
+    /// }
+    ///
+    /// assert_eq!(validate_and_process("5").unwrap(), 10);
+    /// assert!(validate_and_process("-1").is_err());
+    /// ```
+    ///
+    /// ## Database operations with context conversion
+    ///
+    /// ```
+    /// use bigerror::{ResultIntoContext, ThinContext, Report, NotFound, IntoContext};
+    ///
+    /// #[derive(ThinContext)]
+    /// struct DatabaseError;
+    ///
+    /// fn find_user_and_get_email(user_id: u64) -> Result<String, Report<DatabaseError>> {
+    ///     // Simulate finding a user (might return NotFound)
+    ///     find_user(user_id)
+    ///         .into_ctx::<DatabaseError>() // Convert NotFound to DatabaseError
+    ///         .and_then_ctx(|user| {
+    ///             // Extract email from user
+    ///             user.email.ok_or_else(|| {
+    ///                 NotFound::attach_kv("field", "email").into_ctx::<DatabaseError>()
+    ///             })
+    ///         })
+    /// }
+    ///
+    /// # fn find_user(id: u64) -> Result<User, Report<NotFound>> {
+    /// #     Ok(User { email: Some("user@example.com".to_string()) })
+    /// # }
+    /// # struct User { email: Option<String> }
+    /// ```
     fn and_then_ctx<U, F, C2>(self, op: F) -> Result<U, Report<C2>>
     where
         C2: ThinContext,
         F: FnOnce(Self::Ok) -> Result<U, Report<C2>>;
 
     /// Map the success value while converting error context (similar to `Result::map`).
+    ///
+    /// This method transforms the success value of a result using the provided closure,
+    /// while automatically converting any errors to the target context type. This is
+    /// equivalent to `Result::map` but with automatic error context conversion.
+    ///
+    /// # Examples
+    ///
+    /// ## Simple value transformation with context conversion
+    ///
+    /// ```
+    /// use bigerror::{ResultIntoContext, ThinContext, Report};
+    ///
+    /// #[derive(ThinContext)]
+    /// struct MyError;
+    ///
+    /// fn double_parsed_number(input: &str) -> Result<i32, Report<MyError>> {
+    ///     input.parse::<i32>()
+    ///         .into_ctx::<MyError>() // Convert ParseIntError to Report<MyError>
+    ///         .map_ctx(|n| n * 2) // Transform success value
+    /// }
+    ///
+    /// assert_eq!(double_parsed_number("21").unwrap(), 42);
+    /// assert!(double_parsed_number("invalid").is_err());
+    /// ```
+    ///
+    /// ## File processing with transformations
+    ///
+    /// ```
+    /// use bigerror::{ResultIntoContext, ThinContext, Report};
+    ///
+    /// #[derive(ThinContext)]
+    /// struct FileError;
+    ///
+    /// fn count_lines_in_file(path: &str) -> Result<usize, Report<FileError>> {
+    ///     std::fs::read_to_string(path)
+    ///         .into_ctx::<FileError>() // Convert std::io::Error to Report<FileError>
+    ///         .map_ctx(|content| content.lines().count()) // Count lines
+    /// }
+    /// ```
+    ///
+    /// ## Complex data transformations
+    ///
+    /// ```
+    /// use bigerror::{ResultIntoContext, ThinContext, Report};
+    ///
+    /// #[derive(ThinContext)]
+    /// struct ProcessingError;
+    ///
+    /// fn parse_and_format_numbers(input: &str) -> Result<String, Report<ProcessingError>> {
+    ///     input.split(',')
+    ///         .map(|s| s.trim().parse::<i32>().into_ctx::<ProcessingError>())
+    ///         .collect::<Result<Vec<_>, _>>()
+    ///         .map_ctx(|numbers| {
+    ///             numbers.iter()
+    ///                 .map(|n| format!("#{}", n))
+    ///                 .collect::<Vec<_>>()
+    ///                 .join(" ")
+    ///         })
+    /// }
+    ///
+    /// assert_eq!(parse_and_format_numbers("1, 2, 3").unwrap(), "#1 #2 #3");
+    /// ```
     fn map_ctx<U, F, C2>(self, op: F) -> Result<U, Report<C2>>
     where
         C2: ThinContext,
@@ -324,6 +762,65 @@ where
 /// information to error reports.
 pub trait AttachExt {
     /// Attach a key-value pair to the error.
+    ///
+    /// This method adds contextual information in the form of a key-value pair to the error
+    /// report. Both the key and value must implement `Display` and will be formatted using
+    /// their `Display` implementations in error messages.
+    ///
+    /// # Examples
+    ///
+    /// ## Basic key-value attachments
+    ///
+    /// ```
+    /// use bigerror::{AttachExt, ThinContext, Report};
+    ///
+    /// #[derive(ThinContext)]
+    /// struct MyError;
+    ///
+    /// fn process_user(user_id: u64) -> Result<String, Report<MyError>> {
+    ///     // Simulate an error with user context
+    ///     Err(MyError::attach("processing failed"))
+    ///         .attach_kv("user_id", user_id)
+    ///         .attach_kv("operation", "data_processing")
+    /// }
+    ///
+    /// let result = process_user(12345);
+    /// assert!(result.is_err());
+    /// // Error will show: user_id: 12345, operation: data_processing
+    /// ```
+    ///
+    /// ## File operation context
+    ///
+    /// ```
+    /// use bigerror::{AttachExt, ThinContext, Report, ResultIntoContext};
+    ///
+    /// #[derive(ThinContext)]
+    /// struct FileError;
+    ///
+    /// fn read_config_file() -> Result<String, Report<FileError>> {
+    ///     std::fs::read_to_string("config.toml")
+    ///         .into_ctx::<FileError>()
+    ///         .attach_kv("file_path", "config.toml")
+    ///         .attach_kv("operation", "read")
+    /// }
+    /// ```
+    ///
+    /// ## Dynamic context information
+    ///
+    /// ```
+    /// use bigerror::{AttachExt, ThinContext, Report};
+    ///
+    /// #[derive(ThinContext)]
+    /// struct NetworkError;
+    ///
+    /// fn make_request(url: &str, timeout_ms: u64) -> Result<String, Report<NetworkError>> {
+    ///     // Simulate network request failure
+    ///     Err(NetworkError::attach("request timeout")
+    ///         .attach_kv("url", url.to_string())
+    ///         .attach_kv("timeout_ms", timeout_ms)
+    ///         .attach_kv("retry_count", 3))
+    /// }
+    /// ```
     #[must_use]
     fn attach_kv<K, V>(self, key: K, value: V) -> Self
     where
@@ -331,6 +828,72 @@ pub trait AttachExt {
         V: Display;
 
     /// Attach a key-value pair where the value is debug-formatted.
+    ///
+    /// This method is similar to [`attach_kv`](Self::attach_kv) but uses the `Debug`
+    /// implementation of the value instead of `Display`. This is useful for types that
+    /// don't implement `Display` or when you want the debug representation for
+    /// diagnostic purposes.
+    ///
+    /// # Examples
+    ///
+    /// ## Debug formatting for complex types
+    ///
+    /// ```
+    /// use bigerror::{AttachExt, ThinContext, Report};
+    ///
+    /// #[derive(ThinContext)]
+    /// struct ValidationError;
+    ///
+    /// #[derive(Debug)]
+    /// struct Config {
+    ///     debug_mode: bool,
+    ///     max_connections: usize,
+    /// }
+    ///
+    /// fn validate_config(config: Config) -> Result<(), Report<ValidationError>> {
+    ///     if config.max_connections == 0 {
+    ///         return Err(ValidationError::attach("invalid max_connections"))
+    ///             .attach_kv_dbg("config", config); // Uses Debug formatting
+    ///     }
+    ///     Ok(())
+    /// }
+    /// ```
+    ///
+    /// ## Collections and data structures
+    ///
+    /// ```
+    /// use bigerror::{AttachExt, ThinContext, Report};
+    /// use std::collections::HashMap;
+    ///
+    /// #[derive(ThinContext)]
+    /// struct ProcessingError;
+    ///
+    /// fn process_data(data: HashMap<String, i32>) -> Result<i32, Report<ProcessingError>> {
+    ///     if data.is_empty() {
+    ///         return Err(ProcessingError::attach("empty data"))
+    ///             .attach_kv_dbg("received_data", data); // HashMap doesn't implement Display
+    ///     }
+    ///     Ok(data.values().sum())
+    /// }
+    /// ```
+    ///
+    /// ## Error chain with debug context
+    ///
+    /// ```
+    /// use bigerror::{AttachExt, ThinContext, Report, ResultIntoContext};
+    ///
+    /// #[derive(ThinContext)]
+    /// struct ParseError;
+    ///
+    /// fn parse_numbers(input: Vec<&str>) -> Result<Vec<i32>, Report<ParseError>> {
+    ///     let input_owned: Vec<String> = input.iter().map(|s| s.to_string()).collect();
+    ///     input.iter()
+    ///         .map(|s| s.parse::<i32>())
+    ///         .collect::<Result<Vec<_>, _>>()
+    ///         .into_ctx::<ParseError>()
+    ///         .attach_kv_dbg("input_data", input_owned) // Debug format the input vector
+    /// }
+    /// ```
     #[must_use]
     fn attach_kv_dbg<K, V>(self, key: K, value: V) -> Self
     where
@@ -338,18 +901,221 @@ pub trait AttachExt {
         V: Debug;
 
     /// Attach a field with its status.
+    ///
+    /// This method attaches information about a specific field or property and its status.
+    /// It's particularly useful for validation errors, data processing failures, or when
+    /// indicating the state of specific fields in data structures.
+    ///
+    /// # Examples
+    ///
+    /// ## Field validation errors
+    ///
+    /// ```
+    /// use bigerror::{AttachExt, ThinContext, Report, attachment::Missing};
+    ///
+    /// #[derive(ThinContext)]
+    /// struct ValidationError;
+    ///
+    /// fn validate_user_data(email: Option<&str>, age: Option<u32>) -> Result<(), Report<ValidationError>> {
+    ///     let mut error = None;
+    ///
+    ///     if email.is_none() {
+    ///         error = Some(ValidationError::attach("validation failed")
+    ///             .attach_field_status("email", Missing));
+    ///     }
+    ///
+    ///     if let Some(age) = age {
+    ///         if age < 18 {
+    ///             let err = error.unwrap_or_else(|| ValidationError::attach("validation failed"));
+    ///             error = Some(err.attach_field_status("age", "too_young"));
+    ///         }
+    ///     }
+    ///
+    ///     if let Some(err) = error {
+    ///         Err(err)
+    ///     } else {
+    ///         Ok(())
+    ///     }
+    /// }
+    /// ```
+    ///
+    /// ## Database field status
+    ///
+    /// ```
+    /// use bigerror::{AttachExt, ThinContext, Report, attachment::Invalid};
+    ///
+    /// #[derive(ThinContext)]
+    /// struct DatabaseError;
+    ///
+    /// fn update_user_record(user_id: u64, email: &str) -> Result<(), Report<DatabaseError>> {
+    ///     // Simulate database constraint violation
+    ///     if !email.contains('@') {
+    ///         return Err(DatabaseError::attach("constraint violation"))
+    ///             .attach_field_status("email", Invalid)
+    ///             .attach_kv("user_id", user_id);
+    ///     }
+    ///     Ok(())
+    /// }
+    /// ```
+    ///
+    /// ## Configuration field problems
+    ///
+    /// ```
+    /// use bigerror::{AttachExt, ThinContext, Report, attachment::Unsupported};
+    ///
+    /// #[derive(ThinContext)]
+    /// struct ConfigError;
+    ///
+    /// fn load_config(config: &str) -> Result<(), Report<ConfigError>> {
+    ///     // Simulate unsupported configuration option
+    ///     if config.contains("experimental_feature") {
+    ///         return Err(ConfigError::attach("unsupported configuration"))
+    ///             .attach_field_status("experimental_feature", Unsupported);
+    ///     }
+    ///     Ok(())
+    /// }
+    /// ```
     #[must_use]
     fn attach_field_status<S>(self, name: &'static str, status: S) -> Self
     where
         S: Display;
 
     /// Attach a debug-formatted value.
+    ///
+    /// This method attaches a value to the error using its `Debug` implementation for
+    /// formatting. This is useful for types that don't implement `Display` or when
+    /// you want the detailed debug representation rather than the user-friendly display.
+    ///
+    /// # Examples
+    ///
+    /// ## Attaching complex data structures
+    ///
+    /// ```
+    /// use bigerror::{AttachExt, ThinContext, Report};
+    ///
+    /// #[derive(ThinContext)]
+    /// struct ProcessingError;
+    ///
+    /// #[derive(Debug)]
+    /// struct ProcessingState {
+    ///     step: usize,
+    ///     data: Vec<String>,
+    ///     flags: u32,
+    /// }
+    ///
+    /// fn process_data(state: ProcessingState) -> Result<String, Report<ProcessingError>> {
+    ///     if state.data.is_empty() {
+    ///         return Err(ProcessingError::attach("processing failed"))
+    ///             .attach_dbg(state); // Attach the entire state for debugging
+    ///     }
+    ///     Ok(state.data.join(","))
+    /// }
+    /// ```
+    ///
+    /// ## Error values that don't implement Display
+    ///
+    /// ```
+    /// use bigerror::{AttachExt, ThinContext, Report};
+    /// use std::collections::HashMap;
+    ///
+    /// #[derive(ThinContext)]
+    /// struct ConfigError;
+    ///
+    /// fn validate_config(config: HashMap<String, String>) -> Result<(), Report<ConfigError>> {
+    ///     if config.is_empty() {
+    ///         return Err(ConfigError::attach("empty configuration"))
+    ///             .attach_dbg(config); // HashMap<String, String> doesn't implement Display
+    ///     }
+    ///     Ok(())
+    /// }
+    /// ```
+    ///
+    /// ## Debugging with intermediate values
+    ///
+    /// ```
+    /// use bigerror::{AttachExt, ThinContext, Report};
+    ///
+    /// #[derive(ThinContext)]
+    /// struct CalculationError;
+    ///
+    /// fn complex_calculation(inputs: Vec<f64>) -> Result<f64, Report<CalculationError>> {
+    ///     let intermediate_result: Vec<f64> = inputs.iter().map(|x| x * 2.0).collect();
+    ///
+    ///     if intermediate_result.iter().any(|&x| x.is_nan()) {
+    ///         return Err(CalculationError::attach("calculation produced NaN"))
+    ///             .attach_dbg(intermediate_result.clone()) // Debug the intermediate values
+    ///             .attach_dbg(inputs.clone()); // Also debug the original inputs
+    ///     }
+    ///
+    ///     Ok(intermediate_result.iter().sum())
+    /// }
+    /// ```
     #[must_use]
     fn attach_dbg<A>(self, value: A) -> Self
     where
         A: Debug;
 
     /// Attach a type-value pair where the type name is the key.
+    ///
+    /// This is a convenience method that creates a key-value attachment where the key is
+    /// the type name (using the [`ty!`] macro) and the value is the provided value.
+    /// This is useful for adding context about what type of value was involved in an error.
+    ///
+    /// # Examples
+    ///
+    /// ## Attaching typed values for context
+    ///
+    /// ```
+    /// use bigerror::{AttachExt, ThinContext, Report};
+    ///
+    /// #[derive(ThinContext)]
+    /// struct ProcessingError;
+    ///
+    /// fn process_count(count: usize) -> Result<String, Report<ProcessingError>> {
+    ///     if count == 0 {
+    ///         return Err(ProcessingError::attach("invalid count"))
+    ///             .attach_ty_val(count); // Attaches "<usize>: 0"
+    ///     }
+    ///     Ok(format!("Processing {} items", count))
+    /// }
+    /// ```
+    ///
+    /// ## Different types for comparison
+    ///
+    /// ```
+    /// use bigerror::{AttachExt, ThinContext, Report};
+    ///
+    /// #[derive(ThinContext)]
+    /// struct ValidationError;
+    ///
+    /// fn validate_inputs(name: String, age: u32, score: f64) -> Result<(), Report<ValidationError>> {
+    ///     if name.is_empty() {
+    ///         return Err(ValidationError::attach("validation failed"))
+    ///             .attach_ty_val(name)   // "<String>: "
+    ///             .attach_ty_val(age)    // "<u32>: 25"
+    ///             .attach_ty_val(score); // "<f64>: 85.5"
+    ///     }
+    ///     Ok(())
+    /// }
+    /// ```
+    ///
+    /// ## Error context with type information
+    ///
+    /// ```
+    /// use bigerror::{AttachExt, ThinContext, Report};
+    ///
+    /// #[derive(ThinContext)]
+    /// struct ConversionError;
+    ///
+    /// fn safe_divide(a: f64, b: f64) -> Result<f64, Report<ConversionError>> {
+    ///     if b == 0.0 {
+    ///         return Err(ConversionError::attach("division by zero"))
+    ///             .attach_ty_val(a) // "<f64>: 10.0"
+    ///             .attach_ty_val(b); // "<f64>: 0.0"
+    ///     }
+    ///     Ok(a / b)
+    /// }
+    /// ```
     #[must_use]
     fn attach_ty_val<A>(self, value: A) -> Self
     where
@@ -359,8 +1125,90 @@ pub trait AttachExt {
         self.attach_kv(ty!(A), value)
     }
 
-    /// Attach a lazily evaluated KeyValue path
-    /// Note: this is eagerly evaluated, suggested to use in `.map_err` calls
+    /// Attach a file system path to the error.
+    ///
+    /// This method attaches a file system path as a key-value pair where the key is "path"
+    /// and the value is the string representation of the path. This is commonly used for
+    /// file I/O operations to provide context about which file caused the error.
+    ///
+    /// **Note**: The path is converted to a string immediately when this method is called
+    /// (not lazily), so it's recommended to use this in `.map_err()` chains to avoid
+    /// unnecessary string conversions when no error occurs.
+    ///
+    /// # Examples
+    ///
+    /// ## File operation errors
+    ///
+    /// ```
+    /// use bigerror::{AttachExt, ThinContext, Report, ResultIntoContext};
+    /// use std::path::Path;
+    ///
+    /// #[derive(ThinContext)]
+    /// struct FileError;
+    ///
+    /// fn read_config_file<P: AsRef<Path>>(path: P) -> Result<String, Report<FileError>> {
+    ///     std::fs::read_to_string(&path)
+    ///         .into_ctx::<FileError>()
+    ///         .attach_path(path) // Attaches "path: /etc/config.toml"
+    /// }
+    /// ```
+    ///
+    /// ## Directory operations
+    ///
+    /// ```
+    /// use bigerror::{AttachExt, ThinContext, Report, ResultIntoContext};
+    /// use std::path::PathBuf;
+    ///
+    /// #[derive(ThinContext)]
+    /// struct DirectoryError;
+    ///
+    /// fn create_directory(dir_path: PathBuf) -> Result<(), Report<DirectoryError>> {
+    ///     std::fs::create_dir_all(&dir_path)
+    ///         .into_ctx::<DirectoryError>()
+    ///         .attach_path(dir_path) // Attaches the directory path
+    /// }
+    /// ```
+    ///
+    /// ## Multiple file operations
+    ///
+    /// ```
+    /// use bigerror::{AttachExt, ThinContext, Report, ResultIntoContext};
+    /// use std::path::Path;
+    ///
+    /// #[derive(ThinContext)]
+    /// struct BackupError;
+    ///
+    /// fn backup_file(source: &Path, dest: &Path) -> Result<(), Report<BackupError>> {
+    ///     // Read source file
+    ///     let content = std::fs::read_to_string(source)
+    ///         .into_ctx::<BackupError>()
+    ///         .attach_path(source)?;
+    ///
+    ///     // Write to destination
+    ///     std::fs::write(dest, content)
+    ///         .into_ctx::<BackupError>()
+    ///         .attach_path(dest)?;
+    ///
+    ///     Ok(())
+    /// }
+    /// ```
+    ///
+    /// ## Recommended usage pattern
+    ///
+    /// ```
+    /// use bigerror::{AttachExt, ThinContext, Report, ResultIntoContext};
+    /// use std::path::Path;
+    ///
+    /// #[derive(ThinContext)]
+    /// struct IoError;
+    ///
+    /// fn process_file(path: &Path) -> Result<String, Report<IoError>> {
+    ///     // Good: path conversion only happens if there's an error
+    ///     std::fs::read_to_string(path)
+    ///         .into_ctx::<IoError>()
+    ///         .attach_path(path)
+    /// }
+    /// ```
     #[must_use]
     #[cfg(feature = "std")]
     fn attach_path<P: AsRef<Path>>(self, path: P) -> Self
@@ -579,6 +1427,65 @@ where
     Self: Sized,
 {
     /// Convert `None` into a `NotFound` error with type information.
+    ///
+    /// This method transforms an `Option<T>` into a `Result<T, Report<NotFound>>`,
+    /// automatically attaching the type information of `T` to provide context
+    /// about what was expected but not found.
+    ///
+    /// # Examples
+    ///
+    /// ## Basic usage with Option values
+    ///
+    /// ```
+    /// use bigerror::{OptionReport, NotFound, Report};
+    ///
+    /// let maybe_value: Option<String> = None;
+    /// let result: Result<String, Report<NotFound>> = maybe_value.expect_or();
+    /// assert!(result.is_err());
+    /// // Error will include type information: "<String> not found"
+    /// ```
+    ///
+    /// ## With Vec and collections
+    ///
+    /// ```
+    /// use bigerror::{OptionReport, NotFound, Report};
+    ///
+    /// let numbers = vec![1, 2, 3];
+    /// let result: Result<&i32, Report<NotFound>> = numbers.get(10).expect_or();
+    /// assert!(result.is_err());
+    /// // Error will show: "<&i32> not found"
+    /// ```
+    ///
+    /// ## Function return values
+    ///
+    /// ```
+    /// use bigerror::{OptionReport, NotFound, Report};
+    ///
+    /// fn find_user_by_id(id: u64) -> Result<User, Report<NotFound>> {
+    ///     // Simulate database lookup that might return None
+    ///     let user: Option<User> = None; // Database lookup result
+    ///     user.expect_or()
+    /// }
+    ///
+    /// # struct User { name: String }
+    /// let result = find_user_by_id(123);
+    /// assert!(result.is_err());
+    /// // Error will include: "<User> not found"
+    /// ```
+    ///
+    /// ## Chaining with other error handling
+    ///
+    /// ```
+    /// use bigerror::{OptionReport, ResultIntoContext, ThinContext, Report};
+    ///
+    /// #[derive(ThinContext)]
+    /// struct DatabaseError;
+    ///
+    /// fn get_config() -> Result<String, Report<DatabaseError>> {
+    ///     let config: Option<String> = None;
+    ///     config.expect_or().into_ctx()
+    /// }
+    /// ```
     fn expect_or(self) -> Result<T, Report<NotFound>>;
     /// Convert `None` into a `NotFound` error with key-value context.
     fn expect_kv<K, V>(self, key: K, value: V) -> Result<T, Report<NotFound>>
@@ -656,49 +1563,168 @@ impl<T> OptionReport<T> for Option<T> {
 
 #[macro_export]
 macro_rules! __field {
-    // === exits ===
-    // handle optional method calls: self.x.as_ref()
-    ($fn:path, @[$($rf:tt)*] @[$($pre:expr)+], % $field_method:ident() $(.$method:ident())* ) => {
-        $fn($($rf)*$($pre.)+ $field_method() $(.$method())*, stringify!($field_method))
+    ({ } @[$field:ident] ref[$($ref:tt)*] var[$($var:tt)+] fns[$($fn:tt)*]) => {
+        // EXIT: return a tuple
+        (stringify!($field), $($ref)*$($var)*$($fn)*)
     };
-    // handle optional method calls: self.x.as_ref()
-    ($fn:path, @[$($rf:tt)*] @[$($pre:expr)+], $field:ident $(.$method:ident())* ) => {
-        $fn($($rf)*$($pre.)+ $field $(.$method())*, stringify!($field))
+    ({ } @[] ref[$($ref:tt)*] var[$($var:tt)+] fns[$($fn:tt)*]) => {
+        // EXIT: return a tuple
+        (concat!($(stringify!($var),)+), $($ref)*$($var)*$($fn)*)
     };
-    ($fn:path, @[$($rf:tt)*] @[$body:expr], $(.$method:ident())* ) => {
-        $fn($($rf)*$body$(.$method())*, stringify!($body))
+    ({ & $($lifetime:lifetime)? $($rest:tt)+ }
+        @[] ref[$($ref:tt)*] var[] fns[]) => {
+        $crate::__field!(
+            { $($rest)+ }
+            @[]
+            ref[$($ref)* /*add*/ &$($lifetime)? ]
+            var[]
+            fns[]
+        )
+    };
+    ({ * $($rest:tt)+ }
+        @[] ref[$($ref:tt)*] var[] fns[]) => {
+        $crate::__field!(
+            { $($rest)+ }
+            @[]
+            ref[$($ref)* /*add*/ * ]
+            var[]
+            fns[]
+        )
+    };
+    ({ . % $field:ident $($rest:tt)* }
+        @[] ref[$($ref:tt)*] var[$($var:tt)+] fns[$($fn:tt)*]) => {
+        $crate::__field!(
+            { /*add*/ . $field $($rest)* }
+            @[/*add*/ $field]
+            ref[$($ref)*]
+            var[$($var)+]
+            fns[$($fn)*]
+        )
+    };
+    ({. $method:ident($($arg:expr)? $(,$tail_args:expr)* ) $($rest:tt)* }
+        @[$($field:ident)?] ref[$($ref:tt)*] var[$($var:tt)*] fns[$($fn:tt)*]) => {
+        $crate::__field!(
+            { $($rest)* }
+            @[$($field)?]
+            ref[$($ref)*]
+            var[$($var)*]
+            fns[$($fn)* /*add*/ . $method($($arg)? $(, $tail_args)*) ]
+        )
+    };
+    ({ .$property:ident $($rest:tt)* }
+        @[$($field:ident)?] ref[$($ref:tt)*] var[$($var:tt)*] fns[$($fn:tt)*]) => {
+        $crate::__field!(
+            { $($rest)* }
+            @[$($field)?]
+            ref[$($ref)*]
+            var[$($var)* /*add*/ .$property]
+            fns[$($fn)*]
+        )
+    };
+    ({ $var:ident $($rest:tt)* }
+        @[] ref[$($ref:tt)*] var[] fns[]) => {
+        $crate::__field!(
+            { $($rest)* }
+            @[]
+            ref[$($ref)*]
+            var[$var]
+            fns[]
+        )
     };
 
-    // === much TTs ===
-    ($fn:path, @[$($rf:tt)*] @[$($pre:expr)+], $field:ident . $($rest:tt)+) => {
-        $crate::__field!($fn, $($rf:tt)* @[$($pre)+ $field], $($rest)+)
-    };
-
-    // === entries ===
-    ($fn:path | &$body:ident . $($rest:tt)+) => {
-        $crate::__field!($fn, @[&] @[$body], $($rest)+)
-    };
-    ($fn:path | $body:ident . $($rest:tt)+) => {
-        $crate::__field!($fn, @[] @[$body], $($rest)+)
-    };
-
-    // simple cases
-    ($fn:path | &$field:ident) => {
-        $fn(&$field, stringify!($field))
-    };
-    ($fn:path | $field:ident) => {
-        $fn($field, stringify!($field))
+    // ENTRYPOINT
+    ($($body:tt)+) => {
+        $crate::__field!( { $($body)+ } @[] ref[] var[] fns[])
     };
 }
 
+/// Converts an `Option` to a `Result`, using the extracted field name for error context.
+///
+/// This macro extracts field names from expressions and uses them to create descriptive
+/// `NotFound` errors when the `Option` is `None`. It works with variable names, struct
+/// fields, method calls, and complex expressions.
+///
+/// # Examples
+///
+/// ## Basic field extraction
+///
+/// ```
+/// use bigerror::{expect_field, NotFound, Report};
+///
+/// struct User {
+///     email: Option<String>,
+/// }
+///
+/// let user = User { email: None };
+/// let result: Result<&String, Report<NotFound>> = expect_field!(user.email.as_ref());
+/// assert!(result.is_err());
+/// // Error will show: field "email" is missing
+/// ```
+///
+/// ## Method calls
+///
+/// ```
+/// use bigerror::{expect_field, NotFound, Report};
+///
+/// struct Config {
+///     token: Option<String>,
+/// }
+///
+/// impl Config {
+///     fn get_token(&self) -> Option<&str> {
+///         self.token.as_deref()
+///     }
+/// }
+///
+/// let config = Config { token: None };
+/// let result: Result<&str, Report<NotFound>> = expect_field!(config.%get_token());
+/// assert!(result.is_err());
+/// // Error will show: field "get_token" is missing
+/// ```
+///
+/// ## Variable extraction
+///
+/// ```
+/// use bigerror::{expect_field, NotFound, Report};
+///
+/// let session_id: Option<u64> = None;
+/// let result: Result<u64, Report<NotFound>> = expect_field!(session_id);
+/// assert!(result.is_err());
+/// // Error will show: field "session_id" is missing
+/// ```
+///
+/// ## Complex expressions
+///
+/// ```
+/// use bigerror::{expect_field, NotFound, Report};
+///
+/// let data: Option<Vec<String>> = Some(vec![]);
+/// let result: Result<&String, Report<NotFound>> = expect_field!(data.as_ref().and_then(|v| v.first()));
+/// assert!(result.is_err());
+/// // Error will show: field "data" is missing
+/// ```
 #[macro_export]
 macro_rules! expect_field {
     ($($body:tt)+) => {
-        $crate::__field!(
-         $crate::OptionReport::expect_field |
-            $($body)+
-        )
+        {
+            let (__field, __expr)= $crate::__field!($($body)+);
+            $crate::OptionReport::expect_field(__expr, __field)
+        }
     };
+}
+#[cfg(test)]
+#[derive(Default)]
+struct MyStruct {
+    my_field: Option<()>,
+    _string: String,
+}
+
+#[cfg(test)]
+impl MyStruct {
+    fn __field<T>(_property: &'static str, _t: T) {}
+    const fn my_field(&self) -> Option<()> {
+        self.my_field
+    }
 }
 
 #[cfg(test)]
@@ -716,19 +1742,6 @@ mod test {
     #[derive(ThinContext)]
     #[bigerror(crate)]
     pub struct MyError;
-
-    #[derive(Default)]
-    struct MyStruct {
-        my_field: Option<()>,
-        _string: String,
-    }
-
-    impl MyStruct {
-        fn __field<T>(_t: T, _field: &'static str) {}
-        const fn my_field(&self) -> Option<()> {
-            self.my_field
-        }
-    }
 
     macro_rules! assert_err {
         ($result:expr $(,)?) => {
@@ -873,14 +1886,18 @@ mod test {
         let my_field = expect_field!(my_struct.my_field);
         assert_err!(my_field);
         // from field method
-        let my_field = expect_field!(my_struct.%my_field());
+        let my_field = expect_field!(*&my_struct.%my_field());
+        assert_err!(my_field);
+        let my_field = my_struct.my_field;
+        let my_field = expect_field!(my_field.to_owned().to_owned());
         assert_err!(my_field);
     }
 
     // this is meant to be a compile time test of the `__field!` macro
     fn __field() {
         let my_struct = MyStruct::default();
-        __field!(MyStruct::__field::<&str> | &my_struct._string);
+        let (field, val) = __field!(my_struct._string.as_ref());
+        MyStruct::__field::<&str>(field, val);
     }
 
     #[test]
