@@ -1586,7 +1586,7 @@ macro_rules! __field {
         $crate::__field!(
             { $($rest)+ }
             @[]
-            ref[$($ref)* /*add*/ &$($lifetime)? ]
+            ref[$($ref)* /*add*/ &$($lifetime)?]
             var[]
             fns[]
         )
@@ -1596,29 +1596,29 @@ macro_rules! __field {
         $crate::__field!(
             { $($rest)+ }
             @[]
-            ref[$($ref)* /*add*/ * ]
+            ref[$($ref)* /*add*/ *]
             var[]
             fns[]
         )
     };
-    ({ . % $field:ident $($rest:tt)* }
+    ({ .%$field:ident $($rest:tt)* }
         @[] ref[$($ref:tt)*] var[$($var:tt)+] fns[$($fn:tt)*]) => {
         $crate::__field!(
-            { /*add*/ . $field $($rest)* }
+            { /*add*/ .$field $($rest)* }
             @[/*add*/ $field]
             ref[$($ref)*]
             var[$($var)+]
             fns[$($fn)*]
         )
     };
-    ({. $method:ident($($arg:expr)? $(,$tail_args:expr)* ) $($rest:tt)* }
+    ({ .$method:ident($($arg:expr)? $(, $tail_args:expr)*) $($rest:tt)* }
         @[$($field:ident)?] ref[$($ref:tt)*] var[$($var:tt)*] fns[$($fn:tt)*]) => {
         $crate::__field!(
             { $($rest)* }
             @[$($field)?]
             ref[$($ref)*]
             var[$($var)*]
-            fns[$($fn)* /*add*/ . $method($($arg)? $(, $tail_args)*) ]
+            fns[$($fn)* /*add*/ .$method($($arg)? $(, $tail_args)*)]
         )
     };
     ({ .$property:ident $($rest:tt)* }
