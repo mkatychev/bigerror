@@ -19,7 +19,7 @@
 //! use bigerror::{ThinContext, Report, kv, expect_field, ParseError, IntoContext};
 //!
 //! // Define your error type
-//! #[derive(bigerror::ThinContext)]
+//! #[derive(ThinContext)]
 //! struct MyError;
 //!
 //! fn parse_number(input: &str) -> Result<i32, Report<MyError>> {
@@ -197,7 +197,7 @@ pub fn init_no_ansi() {
 /// ```
 /// use bigerror::{ThinContext, Report};
 ///
-/// #[derive(bigerror::ThinContext)]
+/// #[derive(ThinContext)]
 /// pub struct MyError;
 ///
 /// // Create an error with an attachment
@@ -336,7 +336,7 @@ pub trait ReportAs<T> {
     /// ```
     /// use bigerror::{ReportAs, ThinContext, Report};
     ///
-    /// #[derive(bigerror::ThinContext)]
+    /// #[derive(ThinContext)]
     /// struct MyError;
     ///
     /// fn parse_number(s: &str) -> Result<i32, Report<MyError>> {
@@ -353,7 +353,7 @@ pub trait ReportAs<T> {
     /// ```
     /// use bigerror::{ReportAs, ThinContext, Report};
     ///
-    /// #[derive(bigerror::ThinContext)]
+    /// #[derive(ThinContext)]
     /// struct ConfigError;
     ///
     /// fn read_config() -> Result<String, Report<ConfigError>> {
@@ -368,7 +368,7 @@ pub trait ReportAs<T> {
     /// ```
     /// use bigerror::{ReportAs, ThinContext, Report};
     ///
-    /// #[derive(bigerror::ThinContext)]
+    /// #[derive(ThinContext)]
     /// struct ProcessingError;
     ///
     /// fn process_data() -> Result<i32, Report<ProcessingError>> {
@@ -387,7 +387,7 @@ pub trait ReportAs<T> {
     /// use bigerror::{ReportAs, ThinContext, Report};
     /// use error_stack::ResultExt;
     ///
-    /// #[derive(bigerror::ThinContext)]
+    /// #[derive(ThinContext)]
     /// struct MyError;
     ///
     /// // With report_as() - concise and automatic
@@ -480,10 +480,10 @@ pub trait IntoContext {
     /// ```
     /// use bigerror::{IntoContext, ThinContext, Report, NotFound};
     ///
-    /// #[derive(bigerror::ThinContext)]
+    /// #[derive(ThinContext)]
     /// struct DatabaseError;
     ///
-    /// #[derive(bigerror::ThinContext)]
+    /// #[derive(ThinContext)]
     /// struct ServiceError;
     ///
     /// fn fetch_user_data() -> Result<String, Report<ServiceError>> {
@@ -504,7 +504,7 @@ pub trait IntoContext {
     /// ```
     /// use bigerror::{IntoContext, ThinContext, Report};
     ///
-    /// #[derive(bigerror::ThinContext)]
+    /// #[derive(ThinContext)]
     /// struct MyError;
     ///
     /// fn optimized_conversion() -> Result<(), Report<MyError>> {
@@ -522,10 +522,10 @@ pub trait IntoContext {
     /// ```
     /// use bigerror::{IntoContext, ThinContext, Report, ParseError};
     ///
-    /// #[derive(bigerror::ThinContext)]
+    /// #[derive(ThinContext)]
     /// struct ConfigError;
     ///
-    /// #[derive(bigerror::ThinContext)]
+    /// #[derive(ThinContext)]
     /// struct AppError;
     ///
     /// fn load_config() -> Result<i32, Report<ConfigError>> {
@@ -570,7 +570,7 @@ pub trait ResultIntoContext: ResultExt {
     /// ```
     /// use bigerror::{ResultIntoContext, ThinContext, Report};
     ///
-    /// #[derive(bigerror::ThinContext)]
+    /// #[derive(ThinContext)]
     /// struct MyError;
     ///
     /// fn parse_data() -> Result<i32, Report<MyError>> {
@@ -585,7 +585,7 @@ pub trait ResultIntoContext: ResultExt {
     /// ```
     /// use bigerror::{ResultIntoContext, ThinContext, Report};
     ///
-    /// #[derive(bigerror::ThinContext)]
+    /// #[derive(ThinContext)]
     /// struct ProcessingError;
     ///
     /// fn process_file() -> Result<i32, Report<ProcessingError>> {
@@ -610,10 +610,10 @@ pub trait ResultIntoContext: ResultExt {
     /// ```
     /// use bigerror::{ResultIntoContext, ThinContext, Report, IntoContext};
     ///
-    /// #[derive(bigerror::ThinContext)]
+    /// #[derive(ThinContext)]
     /// struct ValidationError;
     ///
-    /// #[derive(bigerror::ThinContext)]
+    /// #[derive(ThinContext)]
     /// struct ProcessingError;
     ///
     /// fn validate_and_process(input: &str) -> Result<i32, Report<ProcessingError>> {
@@ -639,7 +639,7 @@ pub trait ResultIntoContext: ResultExt {
     /// ```
     /// use bigerror::{ResultIntoContext, ThinContext, Report, NotFound, IntoContext};
     ///
-    /// #[derive(bigerror::ThinContext)]
+    /// #[derive(ThinContext)]
     /// struct DatabaseError;
     ///
     /// fn find_user_and_get_email(user_id: u64) -> Result<String, Report<DatabaseError>> {
@@ -677,7 +677,7 @@ pub trait ResultIntoContext: ResultExt {
     /// ```
     /// use bigerror::{ResultIntoContext, ThinContext, Report};
     ///
-    /// #[derive(bigerror::ThinContext)]
+    /// #[derive(ThinContext)]
     /// struct MyError;
     ///
     /// fn double_parsed_number(input: &str) -> Result<i32, Report<MyError>> {
@@ -695,7 +695,7 @@ pub trait ResultIntoContext: ResultExt {
     /// ```
     /// use bigerror::{ResultIntoContext, ThinContext, Report};
     ///
-    /// #[derive(bigerror::ThinContext)]
+    /// #[derive(ThinContext)]
     /// struct FileError;
     ///
     /// fn count_lines_in_file(path: &str) -> Result<usize, Report<FileError>> {
@@ -710,7 +710,7 @@ pub trait ResultIntoContext: ResultExt {
     /// ```
     /// use bigerror::{ResultIntoContext, ThinContext, Report};
     ///
-    /// #[derive(bigerror::ThinContext)]
+    /// #[derive(ThinContext)]
     /// struct ProcessingError;
     ///
     /// fn parse_and_format_numbers(input: &str) -> Result<String, Report<ProcessingError>> {
@@ -792,7 +792,7 @@ pub trait AttachExt {
     /// ```
     /// use bigerror::{AttachExt, ThinContext, Report};
     ///
-    /// #[derive(bigerror::ThinContext)]
+    /// #[derive(ThinContext)]
     /// struct MyError;
     ///
     /// fn process_user(user_id: u64) -> Result<String, Report<MyError>> {
@@ -812,7 +812,7 @@ pub trait AttachExt {
     /// ```
     /// use bigerror::{AttachExt, ThinContext, Report};
     ///
-    /// #[derive(bigerror::ThinContext)]
+    /// #[derive(ThinContext)]
     /// struct FileError;
     ///
     /// fn read_config_file() -> Result<String, Report<FileError>> {
@@ -828,7 +828,7 @@ pub trait AttachExt {
     /// ```
     /// use bigerror::{AttachExt, ThinContext, Report};
     ///
-    /// #[derive(bigerror::ThinContext)]
+    /// #[derive(ThinContext)]
     /// struct NetworkError;
     ///
     /// fn make_request(url: &str, timeout_ms: u64) -> Result<String, Report<NetworkError>> {
@@ -859,7 +859,7 @@ pub trait AttachExt {
     /// ```
     /// use bigerror::{AttachExt, ThinContext, Report};
     ///
-    /// #[derive(bigerror::ThinContext)]
+    /// #[derive(ThinContext)]
     /// struct ValidationError;
     ///
     /// #[derive(Debug)]
@@ -883,7 +883,7 @@ pub trait AttachExt {
     /// use bigerror::{AttachExt, ThinContext, Report};
     /// use std::collections::HashMap;
     ///
-    /// #[derive(bigerror::ThinContext)]
+    /// #[derive(ThinContext)]
     /// struct ProcessingError;
     ///
     /// fn process_data(data: HashMap<String, i32>) -> Result<i32, Report<ProcessingError>> {
@@ -900,7 +900,7 @@ pub trait AttachExt {
     /// ```
     /// use bigerror::{AttachExt, ThinContext, Report};
     ///
-    /// #[derive(bigerror::ThinContext)]
+    /// #[derive(ThinContext)]
     /// struct ParseError;
     ///
     /// fn parse_numbers(input: Vec<&str>) -> Result<Vec<i32>, Report<ParseError>> {
@@ -931,7 +931,7 @@ pub trait AttachExt {
     /// ```
     /// use bigerror::{AttachExt, ThinContext, Report, attachment::Missing};
     ///
-    /// #[derive(bigerror::ThinContext)]
+    /// #[derive(ThinContext)]
     /// struct ValidationError;
     ///
     /// fn validate_user_data(email: Option<&str>, age: Option<u32>) -> Result<(), Report<ValidationError>> {
@@ -962,7 +962,7 @@ pub trait AttachExt {
     /// ```
     /// use bigerror::{AttachExt, ThinContext, Report, attachment::Invalid};
     ///
-    /// #[derive(bigerror::ThinContext)]
+    /// #[derive(ThinContext)]
     /// struct DatabaseError;
     ///
     /// fn update_user_record(user_id: u64, email: &str) -> Result<(), Report<DatabaseError>> {
@@ -981,7 +981,7 @@ pub trait AttachExt {
     /// ```
     /// use bigerror::{AttachExt, ThinContext, Report, attachment::Unsupported};
     ///
-    /// #[derive(bigerror::ThinContext)]
+    /// #[derive(ThinContext)]
     /// struct ConfigError;
     ///
     /// fn load_config(config: &str) -> Result<(), Report<ConfigError>> {
@@ -1011,7 +1011,7 @@ pub trait AttachExt {
     /// ```
     /// use bigerror::{AttachExt, ThinContext, Report};
     ///
-    /// #[derive(bigerror::ThinContext)]
+    /// #[derive(ThinContext)]
     /// struct ProcessingError;
     ///
     /// #[derive(Debug)]
@@ -1036,7 +1036,7 @@ pub trait AttachExt {
     /// use bigerror::{AttachExt, ThinContext, Report};
     /// use std::collections::HashMap;
     ///
-    /// #[derive(bigerror::ThinContext)]
+    /// #[derive(ThinContext)]
     /// struct ConfigError;
     ///
     /// fn validate_config(config: HashMap<String, String>) -> Result<(), Report<ConfigError>> {
@@ -1053,7 +1053,7 @@ pub trait AttachExt {
     /// ```
     /// use bigerror::{AttachExt, ThinContext, Report};
     ///
-    /// #[derive(bigerror::ThinContext)]
+    /// #[derive(ThinContext)]
     /// struct CalculationError;
     ///
     /// fn complex_calculation(inputs: Vec<f64>) -> Result<f64, Report<CalculationError>> {
@@ -1086,7 +1086,7 @@ pub trait AttachExt {
     /// ```
     /// use bigerror::{AttachExt, ThinContext, Report};
     ///
-    /// #[derive(bigerror::ThinContext)]
+    /// #[derive(ThinContext)]
     /// struct ProcessingError;
     ///
     /// fn process_count(count: usize) -> Result<String, Report<ProcessingError>> {
@@ -1103,7 +1103,7 @@ pub trait AttachExt {
     /// ```
     /// use bigerror::{AttachExt, ThinContext, Report};
     ///
-    /// #[derive(bigerror::ThinContext)]
+    /// #[derive(ThinContext)]
     /// struct ValidationError;
     ///
     /// fn validate_inputs(name: String, age: u32, score: f64) -> Result<(), Report<ValidationError>> {
@@ -1122,7 +1122,7 @@ pub trait AttachExt {
     /// ```
     /// use bigerror::{AttachExt, ThinContext, Report};
     ///
-    /// #[derive(bigerror::ThinContext)]
+    /// #[derive(ThinContext)]
     /// struct ConversionError;
     ///
     /// fn safe_divide(a: f64, b: f64) -> Result<f64, Report<ConversionError>> {
@@ -1161,7 +1161,7 @@ pub trait AttachExt {
     /// use bigerror::{AttachExt, ThinContext, Report};
     /// use std::path::Path;
     ///
-    /// #[derive(bigerror::ThinContext)]
+    /// #[derive(ThinContext)]
     /// struct FileError;
     ///
     /// fn read_config_file<P: AsRef<Path>>(path: P) -> Result<String, Report<FileError>> {
@@ -1177,7 +1177,7 @@ pub trait AttachExt {
     /// use bigerror::{AttachExt, ThinContext, Report};
     /// use std::path::PathBuf;
     ///
-    /// #[derive(bigerror::ThinContext)]
+    /// #[derive(ThinContext)]
     /// struct DirectoryError;
     ///
     /// fn create_directory(dir_path: PathBuf) -> Result<(), Report<DirectoryError>> {
@@ -1193,7 +1193,7 @@ pub trait AttachExt {
     /// use bigerror::{AttachExt, ThinContext, Report};
     /// use std::path::Path;
     ///
-    /// #[derive(bigerror::ThinContext)]
+    /// #[derive(ThinContext)]
     /// struct BackupError;
     ///
     /// fn backup_file(source: &Path, dest: &Path) -> Result<(), Report<BackupError>> {
@@ -1217,7 +1217,7 @@ pub trait AttachExt {
     /// use bigerror::{AttachExt, ThinContext, Report};
     /// use std::path::Path;
     ///
-    /// #[derive(bigerror::ThinContext)]
+    /// #[derive(ThinContext)]
     /// struct IoError;
     ///
     /// fn process_file(path: &Path) -> Result<String, Report<IoError>> {
