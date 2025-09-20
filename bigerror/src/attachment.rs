@@ -132,6 +132,9 @@ impl<K: Display, V: Debug> KeyValue<K, Dbg<V>> {
 #[macro_export]
 macro_rules! kv {
     (ty: $value: expr) => {
+        $crate::KeyValue($crate::Type::of(&$value), $value)
+    };
+    (type: $value: expr) => {
         $crate::KeyValue($crate::Type::any(&$value), $value)
     };
     ($($body:tt)+) => {

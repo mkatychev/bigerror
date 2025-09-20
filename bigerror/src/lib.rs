@@ -56,7 +56,7 @@
 //! Attach contextual information to errors using various attachment types:
 //!
 //! ```rust
-//! use bigerror::{ThinContext, kv, ty};
+//! use bigerror::{ThinContext, kv, ty, KeyValue};
 //!
 //! #[derive(ThinContext)]
 //! struct MyError;
@@ -68,10 +68,20 @@
 //! let data = vec![1, 2, 3];
 //! let error = MyError::attach_kv(ty!(Vec<i32>), data.len());
 //!
-//! // Using macros for convenience
-//! let username = "alice";
-//! let error = MyError::attach(kv!(username)); // "username": "alice"
-//! let error = MyError::attach(kv!(ty: username));  // <&str>: "alice"
+//! #[derive(Debug, Clone, Eq, PartialEq)]
+//! struct Username(String);
+//! impl std::fmt::Display for Username {
+//!     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+//!         write!(f, "{}", self.0)
+//!     }
+//! }
+//!
+//! let username = String::from("alice");
+//! assert_eq!(kv!(username.clone()), KeyValue("username", String::from("alice")));
+//! let error = MyError::attach(kv!(username.clone())); // "username": "alice"
+//!
+//! let username = Username(username);
+//! assert_eq!(format!("{}", kv!(ty: username)), "Username: alice");
 //! ```
 //!
 //! ## Conversion and Propagation
