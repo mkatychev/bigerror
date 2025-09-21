@@ -521,7 +521,7 @@ pub trait IntoContext {
     /// struct AppError;
     ///
     /// fn load_config() -> Result<i32, Report<ConfigError>> {
-    ///     "42".parse().into_ctx::<ConfigError>()
+    ///     "42".parse().into_ctx()
     /// }
     ///
     /// fn start_app() -> Result<(), Report<AppError>> {
