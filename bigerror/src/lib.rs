@@ -692,7 +692,7 @@ pub trait ResultIntoContext: ResultExt {
     ///
     /// fn count_lines_in_file(path: &str) -> Result<usize, Report<FileError>> {
     ///     std::fs::read_to_string(path)
-    ///         .into_ctx::<FileError>() // Convert std::io::Error to Report<FileError>
+    ///         .into_ctx() // Convert std::io::Error to Report<FileError>
     ///         .map_ctx(|content| content.lines().count()) // Count lines
     /// }
     /// ```
