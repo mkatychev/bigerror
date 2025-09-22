@@ -1571,6 +1571,7 @@ impl<T> OptionReport<T> for Option<T> {
     }
 }
 
+#[doc(hidden)]
 #[macro_export]
 macro_rules! __field {
     ({ } @[$field:ident] ref[$($ref:tt)*] var[$($var:tt)+] fns[$($fn:tt)*]) => {
