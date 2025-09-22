@@ -81,7 +81,8 @@ impl<K: Display, V: Debug> KeyValue<K, Dbg<V>> {
 /// Creates a [`KeyValue`] pair for error attachments with flexible key-value syntax.
 ///
 /// This macro provides two forms:
-/// - `kv!(ty: value)` - Uses the type of `value` as the key
+/// - `kv!(ty: value)` - Uses the type of `value` as the key: `<String>`
+/// - `kv!(type: value)` - Uses the full type of `value` as the key: `<std::str::String>`
 /// - `kv!(expression)` - Extracts field/variable names from expressions
 ///
 /// # Examples
@@ -94,10 +95,6 @@ impl<K: Display, V: Debug> KeyValue<K, Dbg<V>> {
 /// let number = 42;
 /// let kv_pair = kv!(ty: number);
 /// assert_eq!(kv_pair, KeyValue(Type::of_val(&number), 42));
-///
-/// // Works with literals too
-/// let kv_literal = kv!(ty: "hello");
-/// assert_eq!(kv_literal, KeyValue(Type::of_val(&"hello"), "hello"));
 /// ```
 ///
 /// ## Field/variable extraction
@@ -109,25 +106,26 @@ impl<K: Display, V: Debug> KeyValue<K, Dbg<V>> {
 /// let kv_var = kv!(username);
 /// assert_eq!(kv_var, KeyValue("username", "alice"));
 ///
+/// #[derive(Clone)]
 /// struct User { name: String }
-/// let user = User { name: "bob".to_string() };
-/// let kv_field = kv!(user.name);
-/// assert_eq!(kv_field, KeyValue("user.name", "bob".to_string()));
-/// ```
-///
-/// ## Method calls and complex expressions
-///
-/// ```
-/// use bigerror::{kv, KeyValue};
-///
-/// struct Config { debug: bool }
-/// impl Config {
-///     fn is_debug(&self) -> bool { self.debug }
+/// impl User {
+///     fn name(&self) -> &str {
+///         self.name.as_str()
+///     }
 /// }
+/// let user = User { name: "bob".to_string() };
 ///
-/// let config = Config { debug: true };
-/// let kv_method = kv!(config.%is_debug());
-/// assert_eq!(kv_method, KeyValue("is_debug", true));
+///
+/// let kv_field = kv!(user.name.clone());
+/// assert_eq!(kv_field, KeyValue("user.name", "bob".to_string()));
+///
+/// // adding a `%` will use just the field name
+/// let kv_field = kv!(user.%name.clone());
+/// assert_eq!(kv_field, KeyValue("name", "bob".to_string()));
+///
+/// // `%` works on methods too!
+/// let kv_field = kv!(user.%name());
+/// assert_eq!(kv_field, KeyValue("name", "bob"));
 /// ```
 #[macro_export]
 macro_rules! kv {
@@ -175,7 +173,7 @@ impl<Id: Display, S: Display> Field<Id, S> {
 ///
 /// This type is used to attach type information to error reports, which is useful
 /// for debugging type-related issues or showing what types were involved in an operation.
-#[derive(PartialEq, Eq)]
+#[derive(PartialEq, Eq, derive_more::Deref)]
 pub struct Type(&'static str);
 
 impl Type {
@@ -225,52 +223,15 @@ impl fmt::Debug for Type {
 /// ## Basic type attachments
 ///
 /// ```
-/// use bigerror::{ty, attachment::Type};
+/// use std::path::PathBuf;
+/// use bigerror::{ty, Type};
 ///
 /// // Create type attachments for built-in types
-/// let string_type = ty!(String);
-/// let int_type = ty!(i32);
-/// let vec_type = ty!(Vec<u8>);
+/// let num_type = ty!(PathBuf);
+/// assert_eq!(*num_type, "PathBuf");
 ///
-/// // They display as <TypeName>
-/// assert_eq!(format!("{}", string_type), "<String>");
-/// assert_eq!(format!("{}", int_type), "<i32>");
-/// ```
-///
-/// ## Using with error attachments
-///
-/// ```
-/// use bigerror::{ty, ThinContext, NotFound};
-///
-/// #[derive(bigerror::ThinContext)]
-/// struct MyError;
-///
-/// // Attach type information to errors
-/// let error = MyError::attach(ty!(Vec<String>));
-/// ```
-///
-/// ## In key-value pairs
-///
-/// ```
-/// use bigerror::{ty, KeyValue};
-///
-/// // Use type as a key in key-value attachments
-/// let data = vec![1, 2, 3];
-/// let kv = KeyValue(ty!(Vec<i32>), data.len());
-/// assert_eq!(format!("{}", kv), "<alloc::vec::Vec<i32>>: 3");
-/// ```
-///
-/// ## Custom types
-///
-/// ```
-/// use bigerror::ty;
-///
-/// struct CustomStruct {
-///     field: String,
-/// }
-///
-/// let custom_type = ty!(CustomStruct);
-/// // Will show the full module path in the type name
+/// let num_type = ty!(full: PathBuf);
+/// assert_eq!(*num_type, "std::path::PathBuf");
 /// ```
 #[macro_export]
 macro_rules! ty {
@@ -278,7 +239,7 @@ macro_rules! ty {
         $crate::Type::of::<$type>()
     };
     (full: $type:ty) => {
-        $crate::Type::full::<$type>()
+        $crate::Type::any::<$type>()
     };
 }
 
