@@ -10,7 +10,7 @@ documentation = "https://docs.rs/bigerror"
 repository = "https://github.com/mkatychev/bigerror"
 
 [workspace.dependencies]
-derive_more = { version = "2", features = ["display"], default-features = false }
+derive_more = { version = "2", features = ["display", "deref"], default-features = false }
 tracing = "0.1"
 proc-macro2 = "1.0.101"
 quote = "1.0.40"

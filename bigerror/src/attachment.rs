@@ -66,6 +66,7 @@ impl<K: fmt::Display, V: fmt::Display> fmt::Display for KeyValue<K, V> {
 }
 
 impl<C: Context> core::error::Error for KeyValue<Type, C> {}
+impl<C: Context> core::error::Error for KeyValue<&'static str, C> {}
 
 impl<K: Display, V: Debug> KeyValue<K, Dbg<V>> {
     /// Create a key-value pair where the value is debug-formatted.
@@ -77,15 +78,63 @@ impl<K: Display, V: Debug> KeyValue<K, Dbg<V>> {
     }
 }
 
-/// Allows one to quickly specify a [`KeyValue`] pair, optionally using a
-/// `ty:` prefix using the `$value` [`Type`] as the key
+/// Creates a [`KeyValue`] pair for error attachments with flexible key-value syntax.
+///
+/// # Examples
+///
+/// ## Type-based key-value pairs
+///
+/// ```
+/// use bigerror::{kv, KeyValue, attachment::Type};
+///
+/// let number = 42;
+/// let kv_pair = kv!(ty: number);
+/// assert_eq!(format!("{kv_pair}"), "<i32>: 42");
+/// ```
+///
+/// ## Field/variable extraction
+///
+/// ```
+/// use bigerror::{kv, KeyValue};
+///
+/// let username = "alice";
+/// let kv_var = kv!(username);
+/// assert_eq!(kv_var, KeyValue("username", "alice"));
+///
+/// #[derive(Clone)]
+/// struct User { name: String }
+/// let user = User { name: "bob".to_string() };
+///
+///
+/// let kv_field = kv!(user.name.clone());
+/// assert_eq!(format!("{kv_field}"), "user.name: bob");
+///
+/// // adding a `%` will use just the field name
+/// let kv_field = kv!(user.%name.clone());
+/// assert_eq!(format!("{kv_field}"), "name: bob");
+///
+/// // `%` works on methods too!
+/// impl User {
+///     fn name(&self) -> &str {
+///         self.name.as_str()
+///     }
+/// }
+/// let kv_field = kv!(user.%name());
+/// assert_eq!(format!("{kv_field}"), "name: bob");
+/// ```
 #[macro_export]
 macro_rules! kv {
     (ty: $value: expr) => {
-        $crate::KeyValue($crate::Type::any(&$value), $value)
+        $crate::KeyValue($crate::attachment::Type::of_val(&$value), $value)
     };
-    ($value: expr) => {
-        $crate::KeyValue(stringify!($value), $value)
+    (type: $value: expr) => {
+        $crate::KeyValue($crate::Type::any_val(&$value), $value)
+    };
+    ($($body:tt)+) => {
+        {
+            let (__key, __value)= $crate::__field!($($body)+);
+            $crate::KeyValue(__key, __value)
+        }
     };
 }
 
@@ -119,7 +168,7 @@ impl<Id: Display, S: Display> Field<Id, S> {
 ///
 /// This type is used to attach type information to error reports, which is useful
 /// for debugging type-related issues or showing what types were involved in an operation.
-#[derive(PartialEq, Eq)]
+#[derive(PartialEq, Eq, derive_more::Deref)]
 pub struct Type(&'static str);
 
 impl Type {
@@ -131,12 +180,17 @@ impl Type {
         Self(simple_type_name::<T>())
     }
 
+    #[must_use]
+    pub fn any<T>() -> Self {
+        Self(any::type_name::<T>())
+    }
+
     /// Create a type attachment for the type of the given value.
     pub fn of_val<T: ?Sized>(_val: &T) -> Self {
         Self(simple_type_name::<T>())
     }
     /// Create a type attachment with a fully qualified URI
-    pub fn any<T: ?Sized>(_val: &T) -> Self {
+    pub fn any_val<T: ?Sized>(_val: &T) -> Self {
         Self(any::type_name::<T>())
     }
 }
@@ -153,10 +207,32 @@ impl fmt::Debug for Type {
     }
 }
 
+/// Creates a [`Type`] attachment for the specified type.
+///
+/// This macro provides a convenient way to create type attachments for error reports.
+/// The type attachment shows the type name in error messages, which is useful for
+/// debugging type-related issues or showing what types were involved in an operation.
+///
+/// # Example
+///
+/// ```
+/// use std::path::PathBuf;
+/// use bigerror::{ty, Type};
+///
+/// // Create type attachments for built-in types
+/// let num_type = ty!(PathBuf);
+/// assert_eq!(*num_type, "PathBuf");
+///
+/// let num_type = ty!(full: PathBuf);
+/// assert_eq!(*num_type, "std::path::PathBuf");
+/// ```
 #[macro_export]
 macro_rules! ty {
     ($type:ty) => {
-        $crate::attachment::Type::of::<$type>()
+        $crate::Type::of::<$type>()
+    };
+    (full: $type:ty) => {
+        $crate::Type::any::<$type>()
     };
 }
 
@@ -328,7 +404,7 @@ pub fn hms_string(duration: Duration) -> String {
 /// For generic types like `Option<T>` or `Vec<T>`, it preserves the full
 /// generic syntax.
 ///
-/// # Examples
+/// # Example
 ///
 /// ```
 /// # use bigerror::attachment::simple_type_name;
@@ -359,6 +435,7 @@ pub struct Index<I: fmt::Display>(pub I);
 mod test {
 
     use super::*;
+    use crate::MyStruct;
 
     #[test]
     fn kv_macro() {
@@ -375,5 +452,30 @@ mod test {
         assert_eq!(kv!(ty: foo), KeyValue(Type::of_val(&foo), 13));
         // ensure literal values are handled correctly
         assert_eq!(kv!(ty: 13), KeyValue(Type::of_val(&13), 13));
+    }
+
+    #[test]
+    fn kv_macro_var() {
+        let foo = "Foo";
+        let key_value = kv!(foo.to_owned());
+
+        assert_eq!(key_value, KeyValue("foo", String::from(foo)));
+    }
+
+    #[test]
+    fn kv_macro_struct() {
+        let my_struct = MyStruct {
+            my_field: None,
+            _string: String::from("Value"),
+        };
+
+        let key_value = kv!(my_struct.%my_field());
+        assert_eq!(key_value, KeyValue("my_field", None));
+
+        let key_value = kv!(my_struct.%_string);
+        assert_eq!(key_value, KeyValue("_string", String::from("Value")));
+
+        let key_value = kv!(my_struct.my_field);
+        assert_eq!(key_value, KeyValue("my_struct.my_field", None));
     }
 }

@@ -1,6 +1,6 @@
 [package]
 name = "bigerror"
-version = "0.10.2"
+version = "0.11.0-alpha"
 edition.workspace = true
 description.workspace = true
 license.workspace = true
@@ -30,3 +30,6 @@ derive_more.workspace = true
 
 [lints]
 workspace = true
+
+[package.metadata.docs.rs]
+cargo-args = ["-Zunstable-options", "-Zrustdoc-scrape-examples"]
