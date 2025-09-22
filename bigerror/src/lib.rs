@@ -606,6 +606,7 @@ pub trait AttachExt {
     ///         error = Some(ValidationError::attach("validation failed")
     ///             .attach_field_status("email", Missing));
     ///     }
+    ///     Ok(())
     /// }
     /// ```
     #[must_use]
@@ -622,26 +623,17 @@ pub trait AttachExt {
     /// # Example
     ///
     /// ```
-    /// use bigerror::{AttachExt, ThinContext, Report};
+    /// use bigerror::{AttachExt, ThinContext, Report, DecodeError};
     ///
-    /// #[derive(ThinContext)]
-    /// struct ProcessingError;
-    ///
-    /// #[derive(Debug)]
-    /// struct Data {
-    ///     data: Vec<u8>,
-    ///     flags: u32,
-    /// }
-    ///
-    /// fn process_data(data: Data) -> Result<String, Report<ProcessingError>> {
-    ///     if state.data.is_empty() {
-    ///         return Err(ProcessingError::attach("processing failed"))
-    ///             .attach_dbg(state); // Attach the entire state for debugging
+    /// fn decode_data(data: &mut Vec<u8>) -> Result<&str, Report<DecodeError>> {
+    ///     if data.is_empty() {
+    ///         return Err(DecodeError::attach("no data found"))
+    ///             .attach_dbg(data.clone());
     ///     }
     ///
     ///     // ...
     ///
-    ///     Ok(String::from("data processed"));
+    ///     Ok("data processed")
     /// }
     /// ```
     #[must_use]
