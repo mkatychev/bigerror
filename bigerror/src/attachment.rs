@@ -80,11 +80,6 @@ impl<K: Display, V: Debug> KeyValue<K, Dbg<V>> {
 
 /// Creates a [`KeyValue`] pair for error attachments with flexible key-value syntax.
 ///
-/// This macro provides two forms:
-/// - `kv!(ty: value)` - Uses the type of `value` as the key: `<String>`
-/// - `kv!(type: value)` - Uses the full type of `value` as the key: `<std::str::String>`
-/// - `kv!(expression)` - Extracts field/variable names from expressions
-///
 /// # Examples
 ///
 /// ## Type-based key-value pairs
@@ -94,7 +89,7 @@ impl<K: Display, V: Debug> KeyValue<K, Dbg<V>> {
 ///
 /// let number = 42;
 /// let kv_pair = kv!(ty: number);
-/// assert_eq!(kv_pair, KeyValue(Type::of_val(&number), 42));
+/// assert_eq!(format!("{kv_pair}"), "<i32>: 42");
 /// ```
 ///
 /// ## Field/variable extraction
@@ -108,24 +103,24 @@ impl<K: Display, V: Debug> KeyValue<K, Dbg<V>> {
 ///
 /// #[derive(Clone)]
 /// struct User { name: String }
+/// let user = User { name: "bob".to_string() };
+///
+///
+/// let kv_field = kv!(user.name.clone());
+/// assert_eq!(format!("{kv_field}"), "user.name: bob");
+///
+/// // adding a `%` will use just the field name
+/// let kv_field = kv!(user.%name.clone());
+/// assert_eq!(format!("{kv_field}"), "name: bob");
+///
+/// // `%` works on methods too!
 /// impl User {
 ///     fn name(&self) -> &str {
 ///         self.name.as_str()
 ///     }
 /// }
-/// let user = User { name: "bob".to_string() };
-///
-///
-/// let kv_field = kv!(user.name.clone());
-/// assert_eq!(kv_field, KeyValue("user.name", "bob".to_string()));
-///
-/// // adding a `%` will use just the field name
-/// let kv_field = kv!(user.%name.clone());
-/// assert_eq!(kv_field, KeyValue("name", "bob".to_string()));
-///
-/// // `%` works on methods too!
 /// let kv_field = kv!(user.%name());
-/// assert_eq!(kv_field, KeyValue("name", "bob"));
+/// assert_eq!(format!("{kv_field}"), "name: bob");
 /// ```
 #[macro_export]
 macro_rules! kv {
