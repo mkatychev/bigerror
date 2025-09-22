@@ -166,7 +166,7 @@ pub fn init_no_ansi() {
 /// static methods for creating error reports with attachments. This trait is ideally
 /// used for zero-sized error types or types that hold only `'static` references.
 ///
-/// # Examples
+/// # Example
 ///
 /// ```
 /// use bigerror::{ThinContext, Report};
@@ -526,12 +526,10 @@ pub trait AttachExt {
     /// Attach a key-value pair to the error.
     ///
     /// This method adds contextual information in the form of a key-value pair to the error
-    /// report. Both the key and value must implement `Display` and will be formatted using
+    /// report using the [`KeyValue`] type. Both the key and value must implement `Display` and will be formatted using
     /// their `Display` implementations in error messages.
     ///
-    /// # Examples
-    ///
-    /// ## Basic key-value attachments
+    /// # Example
     ///
     /// ```
     /// use bigerror::{AttachExt, ThinContext, Report};
@@ -544,43 +542,6 @@ pub trait AttachExt {
     ///     Err(MyError::attach("processing failed"))
     ///         .attach_kv("user_id", user_id)
     ///         .attach_kv("operation", "data_processing")
-    /// }
-    ///
-    /// let result = process_user(12345);
-    /// assert!(result.is_err());
-    /// // Error will show: user_id: 12345, operation: data_processing
-    /// ```
-    ///
-    /// ## File operation context
-    ///
-    /// ```
-    /// use bigerror::{AttachExt, ThinContext, Report, ResultIntoContext};
-    ///
-    /// #[derive(ThinContext)]
-    /// struct FileError;
-    ///
-    /// fn read_config_file() -> Result<String, Report<FileError>> {
-    ///     std::fs::read_to_string("config.toml")
-    ///         .into_ctx::<FileError>()
-    ///         .attach_kv("file_path", "config.toml")
-    ///         .attach_kv("operation", "read")
-    /// }
-    /// ```
-    ///
-    /// ## Dynamic context information
-    ///
-    /// ```
-    /// use bigerror::{AttachExt, ThinContext, Report};
-    ///
-    /// #[derive(ThinContext)]
-    /// struct NetworkError;
-    ///
-    /// fn make_request(url: &str, timeout_ms: u64) -> Result<String, Report<NetworkError>> {
-    ///     // Simulate network request failure
-    ///     Err(NetworkError::attach("request timeout")
-    ///         .attach_kv("url", url.to_string())
-    ///         .attach_kv("timeout_ms", timeout_ms)
-    ///         .attach_kv("retry_count", 3))
     /// }
     /// ```
     #[must_use]
@@ -596,9 +557,7 @@ pub trait AttachExt {
     /// don't implement `Display` or when you want the debug representation for
     /// diagnostic purposes.
     ///
-    /// # Examples
-    ///
-    /// ## Debug formatting for complex types
+    /// # Example
     ///
     /// ```
     /// use bigerror::{AttachExt, ThinContext, Report};
@@ -620,42 +579,6 @@ pub trait AttachExt {
     ///     Ok(())
     /// }
     /// ```
-    ///
-    /// ## Collections and data structures
-    ///
-    /// ```
-    /// use bigerror::{AttachExt, ThinContext, Report};
-    /// use std::collections::HashMap;
-    ///
-    /// #[derive(ThinContext)]
-    /// struct ProcessingError;
-    ///
-    /// fn process_data(data: HashMap<String, i32>) -> Result<i32, Report<ProcessingError>> {
-    ///     if data.is_empty() {
-    ///         return Err(ProcessingError::attach("empty data"))
-    ///             .attach_kv_dbg("received_data", data); // HashMap doesn't implement Display
-    ///     }
-    ///     Ok(data.values().sum())
-    /// }
-    /// ```
-    ///
-    /// ## Error chain with debug context
-    ///
-    /// ```
-    /// use bigerror::{AttachExt, ThinContext, Report, ResultIntoContext};
-    ///
-    /// #[derive(ThinContext)]
-    /// struct ParseError;
-    ///
-    /// fn parse_numbers(input: Vec<&str>) -> Result<Vec<i32>, Report<ParseError>> {
-    ///     let input_owned: Vec<String> = input.iter().map(|s| s.to_string()).collect();
-    ///     input.iter()
-    ///         .map(|s| s.parse::<i32>())
-    ///         .collect::<Result<Vec<_>, _>>()
-    ///         .into_ctx::<ParseError>()
-    ///         .attach_kv_dbg("input_data", input_owned) // Debug format the input vector
-    /// }
-    /// ```
     #[must_use]
     fn attach_kv_dbg<K, V>(self, key: K, value: V) -> Self
     where
@@ -668,9 +591,7 @@ pub trait AttachExt {
     /// It's particularly useful for validation errors, data processing failures, or when
     /// indicating the state of specific fields in data structures.
     ///
-    /// # Examples
-    ///
-    /// ## Field validation errors
+    /// # Example
     ///
     /// ```
     /// use bigerror::{AttachExt, ThinContext, Report, attachment::Missing};
@@ -685,56 +606,6 @@ pub trait AttachExt {
     ///         error = Some(ValidationError::attach("validation failed")
     ///             .attach_field_status("email", Missing));
     ///     }
-    ///
-    ///     if let Some(age) = age {
-    ///         if age < 18 {
-    ///             let err = error.unwrap_or_else(|| ValidationError::attach("validation failed"));
-    ///             error = Some(err.attach_field_status("age", "too_young"));
-    ///         }
-    ///     }
-    ///
-    ///     if let Some(err) = error {
-    ///         Err(err)
-    ///     } else {
-    ///         Ok(())
-    ///     }
-    /// }
-    /// ```
-    ///
-    /// ## Database field status
-    ///
-    /// ```
-    /// use bigerror::{AttachExt, ThinContext, Report, attachment::Invalid};
-    ///
-    /// #[derive(ThinContext)]
-    /// struct DbError;
-    ///
-    /// fn update_user_record(user_id: u64, email: &str) -> Result<(), Report<DbError>> {
-    ///     // Simulate database constraint violation
-    ///     if !email.contains('@') {
-    ///         return Err(DbError::attach("constraint violation"))
-    ///             .attach_field_status("email", Invalid)
-    ///             .attach_kv("user_id", user_id);
-    ///     }
-    ///     Ok(())
-    /// }
-    /// ```
-    ///
-    /// ## Configuration field problems
-    ///
-    /// ```
-    /// use bigerror::{AttachExt, ThinContext, Report, attachment::Unsupported};
-    ///
-    /// #[derive(ThinContext)]
-    /// struct ConfigError;
-    ///
-    /// fn load_config(config: &str) -> Result<(), Report<ConfigError>> {
-    ///     // Simulate unsupported configuration option
-    ///     if config.contains("experimental_feature") {
-    ///         return Err(ConfigError::attach("unsupported configuration"))
-    ///             .attach_field_status("experimental_feature", Unsupported);
-    ///     }
-    ///     Ok(())
     /// }
     /// ```
     #[must_use]
@@ -748,9 +619,7 @@ pub trait AttachExt {
     /// formatting. This is useful for types that don't implement `Display` or when
     /// you want the detailed debug representation rather than the user-friendly display.
     ///
-    /// # Examples
-    ///
-    /// ## Attaching complex data structures
+    /// # Example
     ///
     /// ```
     /// use bigerror::{AttachExt, ThinContext, Report};
@@ -759,57 +628,20 @@ pub trait AttachExt {
     /// struct ProcessingError;
     ///
     /// #[derive(Debug)]
-    /// struct ProcessingState {
-    ///     step: usize,
-    ///     data: Vec<String>,
+    /// struct Data {
+    ///     data: Vec<u8>,
     ///     flags: u32,
     /// }
     ///
-    /// fn process_data(state: ProcessingState) -> Result<String, Report<ProcessingError>> {
+    /// fn process_data(data: Data) -> Result<String, Report<ProcessingError>> {
     ///     if state.data.is_empty() {
     ///         return Err(ProcessingError::attach("processing failed"))
     ///             .attach_dbg(state); // Attach the entire state for debugging
     ///     }
-    ///     Ok(state.data.join(","))
-    /// }
-    /// ```
     ///
-    /// ## Error values that don't implement Display
+    ///     // ...
     ///
-    /// ```
-    /// use bigerror::{AttachExt, ThinContext, Report};
-    /// use std::collections::HashMap;
-    ///
-    /// #[derive(ThinContext)]
-    /// struct ConfigError;
-    ///
-    /// fn validate_config(config: HashMap<String, String>) -> Result<(), Report<ConfigError>> {
-    ///     if config.is_empty() {
-    ///         return Err(ConfigError::attach("empty configuration"))
-    ///             .attach_dbg(config); // HashMap<String, String> doesn't implement Display
-    ///     }
-    ///     Ok(())
-    /// }
-    /// ```
-    ///
-    /// ## Debugging with intermediate values
-    ///
-    /// ```
-    /// use bigerror::{AttachExt, ThinContext, Report};
-    ///
-    /// #[derive(ThinContext)]
-    /// struct CalculationError;
-    ///
-    /// fn complex_calculation(inputs: Vec<f64>) -> Result<f64, Report<CalculationError>> {
-    ///     let intermediate_result: Vec<f64> = inputs.iter().map(|x| x * 2.0).collect();
-    ///
-    ///     if intermediate_result.iter().any(|&x| x.is_nan()) {
-    ///         return Err(CalculationError::attach("calculation produced NaN"))
-    ///             .attach_dbg(intermediate_result.clone()) // Debug the intermediate values
-    ///             .attach_dbg(inputs.clone()); // Also debug the original inputs
-    ///     }
-    ///
-    ///     Ok(intermediate_result.iter().sum())
+    ///     Ok(String::from("data processed"));
     /// }
     /// ```
     #[must_use]
@@ -823,9 +655,7 @@ pub trait AttachExt {
     /// the type name (using the [`ty!`] macro) and the value is the provided value.
     /// This is useful for adding context about what type of value was involved in an error.
     ///
-    /// # Examples
-    ///
-    /// ## Attaching typed values for context
+    /// # Example
     ///
     /// ```
     /// use bigerror::{AttachExt, ThinContext, Report};
@@ -839,43 +669,6 @@ pub trait AttachExt {
     ///             .attach_ty_val(count); // Attaches "<usize>: 0"
     ///     }
     ///     Ok(format!("Processing {} items", count))
-    /// }
-    /// ```
-    ///
-    /// ## Different types for comparison
-    ///
-    /// ```
-    /// use bigerror::{AttachExt, ThinContext, Report};
-    ///
-    /// #[derive(ThinContext)]
-    /// struct ValidationError;
-    ///
-    /// fn validate_inputs(name: String, age: u32, score: f64) -> Result<(), Report<ValidationError>> {
-    ///     if name.is_empty() {
-    ///         return Err(ValidationError::attach("validation failed"))
-    ///             .attach_ty_val(name)   // "<String>: "
-    ///             .attach_ty_val(age)    // "<u32>: 25"
-    ///             .attach_ty_val(score); // "<f64>: 85.5"
-    ///     }
-    ///     Ok(())
-    /// }
-    /// ```
-    ///
-    /// ## Error context with type information
-    ///
-    /// ```
-    /// use bigerror::{AttachExt, ThinContext, Report};
-    ///
-    /// #[derive(ThinContext)]
-    /// struct ConversionError;
-    ///
-    /// fn safe_divide(a: f64, b: f64) -> Result<f64, Report<ConversionError>> {
-    ///     if b == 0.0 {
-    ///         return Err(ConversionError::attach("division by zero"))
-    ///             .attach_ty_val(a) // "<f64>: 10.0"
-    ///             .attach_ty_val(b); // "<f64>: 0.0"
-    ///     }
-    ///     Ok(a / b)
     /// }
     /// ```
     #[must_use]
@@ -897,78 +690,16 @@ pub trait AttachExt {
     /// (not lazily), so it's recommended to use this in `.map_err()` chains to avoid
     /// unnecessary string conversions when no error occurs.
     ///
-    /// # Examples
-    ///
-    /// ## File operation errors
+    /// # Example
     ///
     /// ```
-    /// use bigerror::{AttachExt, ThinContext, Report, ResultIntoContext};
+    /// use bigerror::{AttachExt, ThinContext, Report, ResultIntoContext, FsError};
     /// use std::path::Path;
     ///
-    /// #[derive(ThinContext)]
-    /// struct FileError;
-    ///
-    /// fn read_config_file<P: AsRef<Path>>(path: P) -> Result<String, Report<FileError>> {
+    /// fn read_config_file<P: AsRef<Path>>(path: P) -> Result<String, Report<FsError>> {
     ///     std::fs::read_to_string(&path)
-    ///         .into_ctx::<FileError>()
+    ///         .into_ctx()
     ///         .attach_path(path) // Attaches "path: /etc/config.toml"
-    /// }
-    /// ```
-    ///
-    /// ## Directory operations
-    ///
-    /// ```
-    /// use bigerror::{AttachExt, ThinContext, Report, ResultIntoContext};
-    /// use std::path::PathBuf;
-    ///
-    /// #[derive(ThinContext)]
-    /// struct DirectoryError;
-    ///
-    /// fn create_directory(dir_path: PathBuf) -> Result<(), Report<DirectoryError>> {
-    ///     std::fs::create_dir_all(&dir_path)
-    ///         .into_ctx::<DirectoryError>()
-    ///         .attach_path(dir_path) // Attaches the directory path
-    /// }
-    /// ```
-    ///
-    /// ## Multiple file operations
-    ///
-    /// ```
-    /// use bigerror::{AttachExt, ThinContext, Report, ResultIntoContext};
-    /// use std::path::Path;
-    ///
-    /// #[derive(ThinContext)]
-    /// struct BackupError;
-    ///
-    /// fn backup_file(source: &Path, dest: &Path) -> Result<(), Report<BackupError>> {
-    ///     // Read source file
-    ///     let content = std::fs::read_to_string(source)
-    ///         .into_ctx::<BackupError>()
-    ///         .attach_path(source)?;
-    ///
-    ///     // Write to destination
-    ///     std::fs::write(dest, content)
-    ///         .into_ctx::<BackupError>()
-    ///         .attach_path(dest)?;
-    ///
-    ///     Ok(())
-    /// }
-    /// ```
-    ///
-    /// ## Recommended usage pattern
-    ///
-    /// ```
-    /// use bigerror::{AttachExt, ThinContext, Report, ResultIntoContext};
-    /// use std::path::Path;
-    ///
-    /// #[derive(ThinContext)]
-    /// struct IoError;
-    ///
-    /// fn process_file(path: &Path) -> Result<String, Report<IoError>> {
-    ///     // Good: path conversion only happens if there's an error
-    ///     std::fs::read_to_string(path)
-    ///         .into_ctx::<IoError>()
-    ///         .attach_path(path)
     /// }
     /// ```
     #[must_use]
@@ -1194,59 +925,13 @@ where
     /// automatically attaching the type information of `T` to provide context
     /// about what was expected but not found.
     ///
-    /// # Examples
-    ///
-    /// ## Basic usage with Option values
+    /// # Example
     ///
     /// ```
     /// use bigerror::{OptionReport, NotFound, Report};
     ///
     /// let maybe_value: Option<String> = None;
     /// let result: Result<String, Report<NotFound>> = maybe_value.expect_or();
-    /// assert!(result.is_err());
-    /// // Error will include type information: "<String> not found"
-    /// ```
-    ///
-    /// ## With Vec and collections
-    ///
-    /// ```
-    /// use bigerror::{OptionReport, NotFound, Report};
-    ///
-    /// let numbers = vec![1, 2, 3];
-    /// let result: Result<&i32, Report<NotFound>> = numbers.get(10).expect_or();
-    /// assert!(result.is_err());
-    /// // Error will show: "<&i32> not found"
-    /// ```
-    ///
-    /// ## Function return values
-    ///
-    /// ```
-    /// use bigerror::{OptionReport, NotFound, Report};
-    ///
-    /// fn find_user_by_id(id: u64) -> Result<User, Report<NotFound>> {
-    ///     // Simulate database lookup that might return None
-    ///     let user: Option<User> = None; // Database lookup result
-    ///     user.expect_or()
-    /// }
-    ///
-    /// # struct User { name: String }
-    /// let result = find_user_by_id(123);
-    /// assert!(result.is_err());
-    /// // Error will include: "<User> not found"
-    /// ```
-    ///
-    /// ## Chaining with other error handling
-    ///
-    /// ```
-    /// use bigerror::{OptionReport, ResultIntoContext, ThinContext, Report};
-    ///
-    /// #[derive(ThinContext)]
-    /// struct DbError;
-    ///
-    /// fn get_config() -> Result<String, Report<DbError>> {
-    ///     let config: Option<String> = None;
-    ///     config.expect_or().into_ctx()
-    /// }
     /// ```
     fn expect_or(self) -> Result<T, Report<NotFound>>;
     /// Convert `None` into a `NotFound` error with key-value context.
@@ -1407,9 +1092,7 @@ macro_rules! __field {
 /// `NotFound` errors when the `Option` is `None`. It works with variable names, struct
 /// fields, method calls, and complex expressions.
 ///
-/// # Examples
-///
-/// ## Basic field extraction
+/// # Example
 ///
 /// ```
 /// use bigerror::{expect_field, NotFound, Report};
@@ -1420,51 +1103,8 @@ macro_rules! __field {
 ///
 /// let user = User { email: None };
 /// let result: Result<&String, Report<NotFound>> = expect_field!(user.email.as_ref());
-/// assert!(result.is_err());
 /// // Error will show: field "email" is missing
-/// ```
-///
-/// ## Method calls
-///
-/// ```
-/// use bigerror::{expect_field, NotFound, Report};
-///
-/// struct Config {
-///     token: Option<String>,
-/// }
-///
-/// impl Config {
-///     fn get_token(&self) -> Option<&str> {
-///         self.token.as_deref()
-///     }
-/// }
-///
-/// let config = Config { token: None };
-/// let result: Result<&str, Report<NotFound>> = expect_field!(config.%get_token());
 /// assert!(result.is_err());
-/// // Error will show: field "get_token" is missing
-/// ```
-///
-/// ## Variable extraction
-///
-/// ```
-/// use bigerror::{expect_field, NotFound, Report};
-///
-/// let session_id: Option<u64> = None;
-/// let result: Result<u64, Report<NotFound>> = expect_field!(session_id);
-/// assert!(result.is_err());
-/// // Error will show: field "session_id" is missing
-/// ```
-///
-/// ## Complex expressions
-///
-/// ```
-/// use bigerror::{expect_field, NotFound, Report};
-///
-/// let data: Option<Vec<String>> = Some(vec![]);
-/// let result: Result<&String, Report<NotFound>> = expect_field!(data.as_ref().and_then(|v| v.first()));
-/// assert!(result.is_err());
-/// // Error will show: field "data" is missing
 /// ```
 #[macro_export]
 macro_rules! expect_field {

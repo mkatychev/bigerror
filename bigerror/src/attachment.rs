@@ -213,9 +213,7 @@ impl fmt::Debug for Type {
 /// The type attachment shows the type name in error messages, which is useful for
 /// debugging type-related issues or showing what types were involved in an operation.
 ///
-/// # Examples
-///
-/// ## Basic type attachments
+/// # Example
 ///
 /// ```
 /// use std::path::PathBuf;
@@ -406,7 +404,7 @@ pub fn hms_string(duration: Duration) -> String {
 /// For generic types like `Option<T>` or `Vec<T>`, it preserves the full
 /// generic syntax.
 ///
-/// # Examples
+/// # Example
 ///
 /// ```
 /// # use bigerror::attachment::simple_type_name;
