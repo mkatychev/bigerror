@@ -1,6 +1,6 @@
 [package]
 name = "bigerror"
-version = "0.11.0"
+version = "0.12.0"
 edition.workspace = true
 description.workspace = true
 license.workspace = true
@@ -19,7 +19,7 @@ hooks = ["error-stack/hooks"]
 serde = ["error-stack/serde"]
 spantrace = ["error-stack/spantrace"]
 tracing = ["error-stack/tracing"]
-# unstable = ["error-stack/unstable"]
+unstable = ["error-stack/unstable"]
 
 
 [dependencies]

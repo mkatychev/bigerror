@@ -953,6 +953,10 @@ where
     }
 
     /// Convert `None` into a `NotFound` error with a lazily-computed index key.
+    #[deprecated(
+        note = "Use `bigerror::OptionReport::expect_with` instead",
+        since = "0.12.0"
+    )]
     #[inline]
     #[track_caller]
     fn expect_by_fn<F, K>(self, key_fn: F) -> Result<T, Report<NotFound>>
@@ -961,6 +965,27 @@ where
         F: FnOnce() -> K,
     {
         self.expect_kv(Index(key_fn()), ty!(T))
+    }
+
+    /// Convert `None` into a `NotFound` error with a lazily-computed index key.
+    #[inline]
+    #[track_caller]
+    fn expect_with<F, K>(self, key_fn: F) -> Result<T, Report<NotFound>>
+    where
+        K: Display,
+        F: FnOnce() -> K,
+    {
+        self.expect_kv(Index(key_fn()), ty!(T))
+    }
+
+    /// Convert `None` into a `NotFound` That is then propagated to a `ThinContext`
+    #[inline]
+    #[track_caller]
+    fn expect_or_ctx<C>(self) -> Result<T, Report<C>>
+    where
+        C: ThinContext,
+    {
+        self.expect_or().into_ctx()
     }
 }
 
