@@ -89,7 +89,6 @@
 //! See the [`context`] module for the complete list.
 
 #![cfg_attr(not(feature = "std"), no_std)]
-#![expect(deprecated, reason = "We use `Context` to maintain compatibility")]
 
 #[cfg(not(feature = "std"))]
 extern crate alloc;
@@ -122,7 +121,7 @@ use tracing::{Level, debug, error, info, trace, warn};
 /// Derive macro for implementing [`ThinContext`] trait on zero-sized error types.
 pub use bigerror_derive::ThinContext;
 /// Re-export of error-stack types and macros for convenience.
-pub use error_stack::{self, Context, IntoReport, Report, ResultExt, bail, ensure, report};
+pub use error_stack::{self, IntoReport, Report, ResultExt, bail, ensure};
 
 /// Error attachment types and utilities for adding context to error reports.
 pub mod attachment;
@@ -179,7 +178,7 @@ pub fn init_no_ansi() {
 /// ```
 pub trait ThinContext
 where
-    Self: Sized + Context,
+    Self: Sized + core::error::Error + Send + Sync + 'static,
 {
     /// The singleton value for this zero-sized error type.
     const VALUE: Self;
@@ -188,7 +187,7 @@ where
     ///
     /// # Arguments
     /// * `ctx` - The source context to convert from
-    fn report<C: Context>(ctx: C) -> Report<Self> {
+    fn report<C: core::error::Error + Send + Sync + 'static>(ctx: C) -> Report<Self> {
         Report::new(ctx).change_context(Self::VALUE)
     }
 
@@ -314,7 +313,7 @@ pub trait ReportAs<T> {
     fn report_as<C: ThinContext>(self) -> Result<T, Report<C>>;
 }
 
-impl<T, E: Context + core::error::Error> ReportAs<T> for Result<T, E> {
+impl<T, E: core::error::Error + Send + Sync + 'static> ReportAs<T> for Result<T, E> {
     #[inline]
     #[track_caller]
     fn report_as<C: ThinContext>(self) -> Result<T, Report<C>> {

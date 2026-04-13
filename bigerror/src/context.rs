@@ -8,8 +8,6 @@ use std::{path::Path, time::Duration};
 #[cfg(not(feature = "std"))]
 use alloc::{boxed::Box, format};
 
-use error_stack::Context;
-
 use crate::{
     Index, Report, ThinContext,
     attachment::{self, Display, FromTo, Unsupported, simple_type_name},
@@ -275,7 +273,7 @@ impl ConversionError {
     /// This method converts an existing error context into a `ConversionError`
     /// and attaches the source and target type information.
     #[track_caller]
-    pub fn from<F, T>(ctx: impl Context) -> Report<Self> {
+    pub fn from<F, T>(ctx: impl core::error::Error + Send + Sync + 'static) -> Report<Self> {
         Self::report(ctx).attach(FromTo(ty!(F), ty!(T)))
     }
 }

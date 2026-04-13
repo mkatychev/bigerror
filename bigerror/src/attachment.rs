@@ -10,7 +10,7 @@ use alloc::{
 };
 
 use derive_more as dm;
-pub use error_stack::{self, Context, Report, ResultExt};
+pub use error_stack::{self, Report, ResultExt};
 
 /// Trait alias for types that can be displayed and used in error attachments.
 ///
@@ -65,8 +65,11 @@ impl<K: fmt::Display, V: fmt::Display> fmt::Display for KeyValue<K, V> {
     }
 }
 
-impl<C: Context> core::error::Error for KeyValue<Type, C> {}
-impl<C: Context> core::error::Error for KeyValue<&'static str, C> {}
+impl<C: core::error::Error + Send + Sync + 'static> core::error::Error for KeyValue<Type, C> {}
+impl<C: core::error::Error + Send + Sync + 'static> core::error::Error
+    for KeyValue<&'static str, C>
+{
+}
 
 impl<K: Display, V: Debug> KeyValue<K, Dbg<V>> {
     /// Create a key-value pair where the value is debug-formatted.
