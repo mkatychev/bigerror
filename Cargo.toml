@@ -6,8 +6,8 @@ resolver = "2"
 edition = "2024"
 description = "handle big errors ¯\\_(ツ)_/¯"
 license = "MIT"
-documentation = "https://docs.rs/bigerror"
-repository = "https://github.com/mkatychev/bigerror"
+documentation = "https://docs.rs/rootcause-types"
+repository = "https://github.com/mkatychev/rootcause-types"
 
 [workspace.dependencies]
 derive_more = { version = "2", features = ["display", "deref"], default-features = false }
@@ -15,7 +15,7 @@ tracing = "0.1"
 proc-macro2 = "1.0.106"
 quote = "1.0.45"
 syn = "2.0.117"
-rootcause-types-derive = { path = "./bigerror_derive", version = "0.1.0" }
+rootcause-types-derive = { path = "./rootcause-types-derive", version = "=0.1.0" }
 rootcause = "0.13.0"
 rootcause-backtrace = { version = "0.13.0" }
 rootcause-tracing = { version = "0.13.0" }

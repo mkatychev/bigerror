@@ -22,11 +22,6 @@ printerr test $PRINTERR="true":
 printerr-all $PRINTERR="true" $RUST_TEST_THREADS="1":
   @cargo test --lib -- --exact --nocapture
 
-# vendor only rootcause
-[script("nu")]
-vendor:
-  cargo vendor; ls ./vendor | where name !~ 'rootcause' | each { rm -rf $in.name }
-
 # check all types of clippy carges
 check:
   cargo check --all-features

@@ -5,7 +5,7 @@ use syn::{DeriveInput, parse_macro_input};
 mod attributes;
 mod context;
 
-#[proc_macro_derive(ThinContext, attributes(display, bigerror))]
+#[proc_macro_derive(ThinContext, attributes(display, rootcause_types))]
 pub fn derive_thin_context(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
     match context::thin(&input) {

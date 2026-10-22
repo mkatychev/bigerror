@@ -52,7 +52,7 @@ impl Attributes {
             if attr.path().is_ident("display") {
                 builder.display = true;
             }
-            if attr.path().is_ident("bigerror") {
+            if attr.path().is_ident("rootcause_types") {
                 attr.parse_nested_meta(|meta| builder.parse_meta(&meta))?;
             }
         }
@@ -60,7 +60,7 @@ impl Attributes {
         let crate_path = builder
             .crate_path
             .take()
-            .unwrap_or_else(|| parse_quote! { ::bigerror });
+            .unwrap_or_else(|| parse_quote! { ::rootcause_types });
         Ok(Self {
             has_display,
             crate_path,

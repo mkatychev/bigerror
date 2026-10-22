@@ -30,7 +30,7 @@ pub fn thin(input: &DeriveInput) -> Result<TokenStream, Error> {
         }
     }
 
-    let bigerror = attributes.crate_path;
+    let rootcause_types = attributes.crate_path;
     let impl_display = (!attributes.has_display).then(|| {
         quote! {
             impl ::core::fmt::Display for #ctx {
