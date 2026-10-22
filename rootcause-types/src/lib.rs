@@ -1,6 +1,6 @@
 //! Enhanced error handling library built on top of [`rootcause`](https://docs.rs/rootcause).
 //!
-//! `bigerror` provides ergonomic error handling adding out of the box functionality to [`rootcause`](https://docs.rs/rootcause)
+//! `rootcause_types` provides ergonomic error handling adding out of the box functionality to [`rootcause`](https://docs.rs/rootcause)
 //! for common scenarios.
 //!
 //! # Key Features
@@ -13,7 +13,7 @@
 //! # Quick Start
 //!
 //! ```rust
-//! use bigerror::{ThinContext, Report, expect_field, IntoContext, ResultIntoContext, NotFound};
+//! use rootcause_types::{ThinContext, Report, expect_field, IntoContext, ResultIntoContext, NotFound};
 //!
 //! // Define your error type
 //! #[derive(ThinContext)]
@@ -39,7 +39,7 @@
 //! Attach contextual information to errors using various attachment types:
 //!
 //! ```rust
-//! use bigerror::{ThinContext, kv, ty, KeyValue};
+//! use rootcause_types::{ThinContext, kv, ty, KeyValue};
 //!
 //! #[derive(ThinContext)]
 //! struct MyError;
@@ -118,7 +118,7 @@ pub use rootcause::{
 pub mod attachment;
 /// Common error context types for different categories of errors.
 pub mod context;
-/// Custom [`rootcause`] handlers used by `bigerror`.
+/// Custom [`rootcause`] handlers used by `rootcause_types`.
 pub mod handlers;
 
 /// Re-export of commonly used attachment types.
@@ -146,7 +146,7 @@ where
 /// # Example
 ///
 /// ```
-/// use bigerror::{ThinContext, Report};
+/// use rootcause_types::{ThinContext, Report};
 ///
 /// #[derive(ThinContext)]
 /// pub struct MyError;
@@ -275,7 +275,7 @@ pub trait ReportAs<T> {
     /// # Example
     ///
     /// ```
-    /// use bigerror::{ReportAs, ThinContext, Report};
+    /// use rootcause_types::{ReportAs, ThinContext, Report};
     ///
     /// #[derive(ThinContext)]
     /// struct MyError;
@@ -319,7 +319,7 @@ pub trait IntoContext {
     /// # Example
     ///
     /// ```
-    /// use bigerror::{IntoContext, ThinContext, Report, NotFound, ResultIntoContext, DbError};
+    /// use rootcause_types::{IntoContext, ThinContext, Report, NotFound, ResultIntoContext, DbError};
     ///
     /// #[derive(ThinContext)]
     /// struct ServiceError;
@@ -365,7 +365,7 @@ pub trait ResultIntoContext<V, E>: ResultExt<V, E> {
     /// # Example
     ///
     /// ```
-    /// use bigerror::{ResultIntoContext, ThinContext, Report};
+    /// use rootcause_types::{ResultIntoContext, ThinContext, Report};
     ///
     /// #[derive(ThinContext)]
     /// struct MyParseError;
@@ -388,7 +388,7 @@ pub trait ResultIntoContext<V, E>: ResultExt<V, E> {
     /// # Example
     ///
     /// ```
-    /// use bigerror::{
+    /// use rootcause_types::{
     ///     DbError, NotFound, OptionExt, Report, ResultIntoContext, expect_field,
     /// };
     ///
@@ -428,7 +428,7 @@ pub trait ResultIntoContext<V, E>: ResultExt<V, E> {
     ///
     /// ```
     /// use std::path::Path;
-    /// use bigerror::{ResultIntoContext, Report, FsError};
+    /// use rootcause_types::{ResultIntoContext, Report, FsError};
     ///
     /// fn count_lines_in_file(path: &Path) -> Result<usize, Report<FsError>> {
     ///     std::fs::read_to_string(path)
@@ -496,7 +496,7 @@ pub trait AttachExt {
     /// # Example
     ///
     /// ```
-    /// use bigerror::{AttachExt, ThinContext, Report};
+    /// use rootcause_types::{AttachExt, ThinContext, Report};
     ///
     /// #[derive(ThinContext)]
     /// struct MyError;
@@ -524,7 +524,7 @@ pub trait AttachExt {
     /// # Example
     ///
     /// ```
-    /// use bigerror::{AttachExt, ThinContext, Report};
+    /// use rootcause_types::{AttachExt, ThinContext, Report};
     ///
     /// #[derive(ThinContext)]
     /// struct ValidationError;
@@ -558,7 +558,7 @@ pub trait AttachExt {
     /// # Example
     ///
     /// ```
-    /// use bigerror::{AttachExt, ThinContext, Report, attachment::Missing};
+    /// use rootcause_types::{AttachExt, ThinContext, Report, attachment::Missing};
     ///
     /// #[derive(ThinContext)]
     /// struct ValidationError;
@@ -587,7 +587,7 @@ pub trait AttachExt {
     /// # Example
     ///
     /// ```
-    /// use bigerror::{AttachExt, ThinContext, Report, DecodeError};
+    /// use rootcause_types::{AttachExt, ThinContext, Report, DecodeError};
     ///
     /// fn decode_data(data: &mut Vec<u8>) -> Result<&str, Report<DecodeError>> {
     ///     if data.is_empty() {
@@ -614,7 +614,7 @@ pub trait AttachExt {
     /// # Example
     ///
     /// ```
-    /// use bigerror::{AttachExt, ThinContext, Report};
+    /// use rootcause_types::{AttachExt, ThinContext, Report};
     ///
     /// #[derive(ThinContext)]
     /// struct ProcessingError;
@@ -649,7 +649,7 @@ pub trait AttachExt {
     /// # Example
     ///
     /// ```
-    /// use bigerror::{AttachExt, ThinContext, Report, ResultIntoContext, FsError};
+    /// use rootcause_types::{AttachExt, ThinContext, Report, ResultIntoContext, FsError};
     /// use std::path::Path;
     ///
     /// fn read_config_file<P: AsRef<Path>>(path: P) -> Result<String, Report<FsError>> {
@@ -1053,7 +1053,7 @@ macro_rules! __field {
 /// # Example
 ///
 /// ```
-/// use bigerror::{expect_field, NotFound, Report};
+/// use rootcause_types::{expect_field, NotFound, Report};
 ///
 /// struct User {
 ///     email: Option<String>,
@@ -1082,7 +1082,7 @@ macro_rules! expect_field {
 /// # Example
 ///
 /// ```
-/// use bigerror::{ensure, Report};
+/// use rootcause_types::{ensure, Report};
 ///
 /// fn check(value: i32) -> Result<(), Report> {
 ///     ensure!(value > 0, "value must be positive, got {}", value);
@@ -1105,7 +1105,7 @@ macro_rules! ensure {
     };
 }
 
-/// Install the `bigerror` default hooks: colored unicode report formatting and,
+/// Install the `rootcause_types` default hooks: colored unicode report formatting and,
 /// when the corresponding features are enabled, automatic backtrace and span
 /// attachment collection.
 ///
@@ -1153,7 +1153,7 @@ mod test {
     use super::*;
 
     #[derive(ThinContext)]
-    #[bigerror(crate)]
+    #[rootcause_types(crate)]
     pub struct MyError;
 
     macro_rules! assert_err {

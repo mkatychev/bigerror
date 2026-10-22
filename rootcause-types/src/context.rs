@@ -30,7 +30,7 @@ use crate::{Field, attachment::DisplayDuration};
 /// * [rkyv AllocSerializer](https://docs.rs/rkyv/latest/rkyv/ser/serializers/type.AllocSerializer.html)
 /// * [serde::Serializer](https://docs.rs/serde/latest/serde/trait.Serializer.html)
 #[derive(ThinContext)]
-#[bigerror(crate)]
+#[rootcause_types(crate)]
 pub struct DecodeError;
 
 /// Represents errors emitted while turning an object into bytes.
@@ -38,7 +38,7 @@ pub struct DecodeError;
 /// This is the counterpart to [`DecodeError`] and is used in serialization,
 /// encoding, and similar byte-generation operations.
 #[derive(ThinContext)]
-#[bigerror(crate)]
+#[rootcause_types(crate)]
 pub struct EncodeError;
 
 /// Represents errors emitted during authorization or verification checks.
@@ -46,7 +46,7 @@ pub struct EncodeError;
 /// This error type is used for authentication failures, permission denials,
 /// token validation errors, and similar security-related issues.
 #[derive(ThinContext)]
-#[bigerror(crate)]
+#[rootcause_types(crate)]
 pub struct AuthError;
 
 /// Represents errors related to network operations.
@@ -54,7 +54,7 @@ pub struct AuthError;
 /// This includes connection failures, timeouts, DNS resolution errors,
 /// and other network-related issues.
 #[derive(ThinContext)]
-#[bigerror(crate)]
+#[rootcause_types(crate)]
 pub struct NetworkError;
 
 /// Represents errors emitted while processing strings (UTF-8 or otherwise).
@@ -64,7 +64,7 @@ pub struct NetworkError;
 /// * The `.parse::<T>()` method
 /// * String validation and formatting operations
 #[derive(ThinContext)]
-#[bigerror(crate)]
+#[rootcause_types(crate)]
 pub struct ParseError;
 
 /// Represents the conversion of an `Option<T>::None` into a [`Report`].
@@ -74,7 +74,7 @@ pub struct ParseError;
 /// * Missing fields in data structures
 /// * Failed lookups or searches
 #[derive(ThinContext)]
-#[bigerror(crate)]
+#[rootcause_types(crate)]
 pub struct NotFound;
 
 /// Represents errors related to database operations.
@@ -82,7 +82,7 @@ pub struct NotFound;
 /// This includes connection errors, query failures, transaction issues,
 /// and other database-related problems.
 #[derive(ThinContext)]
-#[bigerror(crate)]
+#[rootcause_types(crate)]
 pub struct DbError;
 
 /// Represents errors related to filesystem operations.
@@ -90,7 +90,7 @@ pub struct DbError;
 /// This includes file I/O errors, permission issues, path problems,
 /// and other filesystem-related operations such as those in [`std::fs`].
 #[derive(ThinContext)]
-#[bigerror(crate)]
+#[rootcause_types(crate)]
 pub struct FsError;
 
 /// Represents errors emitted during the startup or provisioning phase of a program.
@@ -98,7 +98,7 @@ pub struct FsError;
 /// This includes configuration loading, resource initialization,
 /// dependency setup, and other bootstrap-related failures.
 #[derive(ThinContext)]
-#[bigerror(crate)]
+#[rootcause_types(crate)]
 pub struct SetupError;
 
 /// Represents errors emitted during transformations between complex data types.
@@ -107,7 +107,7 @@ pub struct SetupError;
 /// such as structs, enums, and unions. It's commonly used in type conversion,
 /// data mapping, and transformation operations.
 #[derive(ThinContext)]
-#[bigerror(crate)]
+#[rootcause_types(crate)]
 pub struct ConversionError;
 
 /// Represents errors for invalid input data or parameters.
@@ -118,7 +118,7 @@ pub struct ConversionError;
 /// * Out-of-range values
 /// * Format violations
 #[derive(ThinContext)]
-#[bigerror(crate)]
+#[rootcause_types(crate)]
 pub struct InvalidInput;
 
 /// Represents errors for invalid status conditions.
@@ -126,7 +126,7 @@ pub struct InvalidInput;
 /// This error type is used when an operation encounters an unexpected
 /// or invalid status, such as state machine violations or status checks.
 #[derive(ThinContext)]
-#[bigerror(crate)]
+#[rootcause_types(crate)]
 pub struct InvalidStatus;
 
 /// Represents errors for invalid state conditions.
@@ -135,7 +135,7 @@ pub struct InvalidStatus;
 /// for the requested operation, including state machine violations and
 /// precondition failures.
 #[derive(ThinContext)]
-#[bigerror(crate)]
+#[rootcause_types(crate)]
 pub struct InvalidState;
 
 /// Represents errors related to configuration issues.
@@ -146,7 +146,7 @@ pub struct InvalidState;
 /// * Missing required settings
 /// * Default setting conflicts
 #[derive(ThinContext)]
-#[bigerror(crate)]
+#[rootcause_types(crate)]
 pub struct ConfigError;
 
 /// Represents errors related to build processes.
@@ -157,7 +157,7 @@ pub struct ConfigError;
 /// * Build tool issues
 /// * Asset generation problems
 #[derive(ThinContext)]
-#[bigerror(crate)]
+#[rootcause_types(crate)]
 pub struct BuildError;
 
 /// Represents a timeout error with duration information.
@@ -174,7 +174,7 @@ impl ::core::error::Error for Timeout {}
 /// This error type is used for assertion failures, contract violations,
 /// and other conditions that should never occur in correct program execution.
 #[derive(ThinContext)]
-#[bigerror(crate)]
+#[rootcause_types(crate)]
 pub struct AssertionError;
 
 impl FsError {

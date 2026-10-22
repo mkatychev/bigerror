@@ -1,5 +1,5 @@
 [package]
-name = "bigerror"
+name = "rootcause-types"
 version = "0.14.0"
 edition.workspace = true
 description.workspace = true

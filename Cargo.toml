@@ -1,5 +1,5 @@
 [workspace]
-members = ["bigerror", "bigerror_derive"]
+members = ["rootcause-types", "bigerror_derive"]
 resolver = "2"
 
 [workspace.package]

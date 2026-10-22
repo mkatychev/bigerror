@@ -19,7 +19,7 @@ pub fn derive_ctx(_attr: TokenStream, input: TokenStream) -> TokenStream {
     let input: proc_macro2::TokenStream = input.into();
     let output = quote! {
         #[derive(crate::ThinContext)]
-        #[bigerror(crate)]
+        #[rootcause_types(crate)]
         #input
     };
     output.into()

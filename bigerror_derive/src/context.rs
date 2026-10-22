@@ -50,7 +50,7 @@ pub fn thin(input: &DeriveInput) -> Result<TokenStream, Error> {
         }
 
         #impl_display
-        impl #bigerror::ThinContext for #ctx {
+        impl #rootcause_types::ThinContext for #ctx {
             const VALUE: Self = #ctx;
         }
     })

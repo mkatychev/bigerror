@@ -81,7 +81,7 @@ impl<K: Display, V: Debug> KeyValue<K, Dbg<V>> {
 /// ## Type-based key-value pairs
 ///
 /// ```
-/// use bigerror::{kv, KeyValue, attachment::Type};
+/// use rootcause_types::{kv, KeyValue, attachment::Type};
 ///
 /// let number = 42;
 /// let kv_pair = kv!(ty: number);
@@ -91,7 +91,7 @@ impl<K: Display, V: Debug> KeyValue<K, Dbg<V>> {
 /// ## Field/variable extraction
 ///
 /// ```
-/// use bigerror::{kv, KeyValue};
+/// use rootcause_types::{kv, KeyValue};
 ///
 /// let username = "alice";
 /// let kv_var = kv!(username);
@@ -213,7 +213,7 @@ impl fmt::Debug for Type {
 ///
 /// ```
 /// use std::path::PathBuf;
-/// use bigerror::{ty, Type};
+/// use rootcause_types::{ty, Type};
 ///
 /// // Create type attachments for built-in types
 /// let num_type = ty!(PathBuf);
@@ -391,7 +391,7 @@ pub fn hms_string(duration: Duration) -> String {
 /// # Example
 ///
 /// ```
-/// # use bigerror::attachment::simple_type_name;
+/// # use rootcause_types::attachment::simple_type_name;
 /// assert_eq!(simple_type_name::<String>(), "String");
 /// assert_eq!(simple_type_name::<Option<i32>>(), "core::option::Option<i32>");
 /// ```
