@@ -1,6 +1,6 @@
 [workspace]
 members = ["rootcause-types", "rootcause-types-derive"]
-resolver = "2"
+resolver = "3"
 
 [workspace.package]
 edition = "2024"
@@ -12,9 +12,9 @@ repository = "https://github.com/mkatychev/rootcause-types"
 [workspace.dependencies]
 derive_more = { version = "2", features = ["display", "deref"], default-features = false }
 tracing = "0.1"
-proc-macro2 = "1.0.106"
-quote = "1.0.45"
-syn = "2.0.117"
+proc-macro2 = "1.0.107"
+quote = "1.0.47"
+syn = "3.0.9"
 rootcause-types-derive = { path = "./rootcause-types-derive", version = "=0.1.0" }
 rootcause = "0.13.0"
 rootcause-backtrace = { version = "0.13.0" }
