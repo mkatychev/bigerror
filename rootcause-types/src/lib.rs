@@ -105,7 +105,7 @@ use std::path::Path;
 use tracing::{Level, debug, error, info, trace, warn};
 
 /// Derive macro for implementing [`ThinContext`] trait on zero-sized error types.
-pub use bigerror_derive::ThinContext;
+pub use rootcause_types_derive::ThinContext;
 
 /// Re-export of rootcause's `Option` extension trait and error type.
 pub use rootcause::option_ext::{NoneError, OptionExt};

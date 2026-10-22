@@ -1,5 +1,5 @@
 [workspace]
-members = ["rootcause-types", "bigerror_derive"]
+members = ["rootcause-types", "rootcause-types-derive"]
 resolver = "2"
 
 [workspace.package]
@@ -15,7 +15,7 @@ tracing = "0.1"
 proc-macro2 = "1.0.106"
 quote = "1.0.45"
 syn = "2.0.117"
-bigerror-derive = { path = "./bigerror_derive", version = "0.1.0" }
+rootcause-types-derive = { path = "./bigerror_derive", version = "0.1.0" }
 rootcause = "0.13.0"
 rootcause-backtrace = { version = "0.13.0" }
 rootcause-tracing = { version = "0.13.0" }

@@ -22,7 +22,7 @@ rootcause = { workspace = true }
 rootcause-backtrace = { workspace = true, optional = true }
 rootcause-tracing = { workspace = true, optional = true }
 tracing = { workspace = true, optional = true, features = ["attributes"] }
-bigerror-derive.workspace = true
+rootcause-types-derive.workspace = true
 derive_more.workspace = true
 
 [lints]

@@ -1,5 +1,5 @@
 [package]
-name = "bigerror-derive"
+name = "rootcause-types-derive"
 version = "0.1.0"
 edition.workspace = true
 description.workspace = true
