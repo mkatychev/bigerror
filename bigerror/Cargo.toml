@@ -9,7 +9,7 @@ repository.workspace = true
 
 [features]
 default = ["std", "backtrace"]
-std = ["derive_more/std", "tracing?/std"]
+std = ["tracing?/std"]
 backtrace = ["std", "dep:rootcause-backtrace"]
 tracing = ["dep:tracing"]
 spantrace = ["std", "tracing", "dep:rootcause-tracing"]
