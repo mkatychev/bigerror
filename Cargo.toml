@@ -14,9 +14,11 @@ derive_more = { version = "2", features = ["display", "deref"], default-features
 tracing = "0.1"
 proc-macro2 = "1.0.106"
 quote = "1.0.45"
-error-stack = { version =  "0.7.0", default-features = false }
 syn = "2.0.117"
 bigerror-derive = { path = "./bigerror_derive", version = "0.1.0" }
+rootcause = "0.13.0"
+rootcause-backtrace = { version = "0.13.0" }
+rootcause-tracing = { version = "0.13.0" }
 
 [workspace.lints.clippy]
 uninlined_format_args = "deny"

@@ -1,6 +1,6 @@
-//! Enhanced error handling library built on top of [`error-stack`][error_stack].
+//! Enhanced error handling library built on top of [`rootcause`](https://docs.rs/rootcause).
 //!
-//! `bigerror` provides ergonomic error handling adding out of the box functionality to [`error-stack`][error_stack]
+//! `bigerror` provides ergonomic error handling adding out of the box functionality to [`rootcause`](https://docs.rs/rootcause)
 //! for common scenarios.
 //!
 //! # Key Features
@@ -70,9 +70,9 @@
 //! # Feature Flags
 //!
 //! - `std` (default) - Standard library support
-//! - `backtrace` (default) - Backtrace support
+//! - `backtrace` (default) - Backtrace support via `rootcause-backtrace`
 //! - `tracing` - Integration with the tracing ecosystem
-//! - `serde` - Serialization support
+//! - `spantrace` - Span capture via `rootcause-tracing`
 //! - `anyhow` - Compatibility with anyhow
 //! - `eyre` - Compatibility with eyre
 //!
@@ -93,40 +93,33 @@
 #[cfg(not(feature = "std"))]
 extern crate alloc;
 
-#[cfg(not(feature = "std"))]
-use alloc::{format, vec};
-
-use error_stack::fmt::ColorMode;
+use core::any;
 
 #[cfg(all(not(feature = "std"), feature = "tracing"))]
 use core::fmt;
-#[cfg(not(feature = "std"))]
-use core::{
-    any::{self, TypeId},
-    mem,
-    panic::Location,
-};
 #[cfg(all(feature = "std", feature = "tracing"))]
 use std::fmt;
 #[cfg(feature = "std")]
-use std::{
-    any::{self, TypeId},
-    mem,
-    panic::Location,
-    path::Path,
-};
+use std::path::Path;
 #[cfg(feature = "tracing")]
 use tracing::{Level, debug, error, info, trace, warn};
 
 /// Derive macro for implementing [`ThinContext`] trait on zero-sized error types.
 pub use bigerror_derive::ThinContext;
-/// Re-export of error-stack types and macros for convenience.
-pub use error_stack::{self, IntoReport, Report, ResultExt, bail, ensure};
+
+/// Re-export of rootcause's `Option` extension trait and error type.
+pub use rootcause::option_ext::{NoneError, OptionExt};
+/// Re-export of rootcause types and macros for convenience.
+pub use rootcause::{
+    self, IntoReport, IntoReportCollection, Report, bail, markers, prelude::ResultExt, report,
+};
 
 /// Error attachment types and utilities for adding context to error reports.
 pub mod attachment;
 /// Common error context types for different categories of errors.
 pub mod context;
+/// Custom [`rootcause`] handlers used by `bigerror`.
+pub mod handlers;
 
 /// Re-export of commonly used attachment types.
 pub use attachment::{Expectation, Field, Index, KeyValue, Type};
@@ -135,9 +128,18 @@ use attachment::{Dbg, Debug, Display};
 /// Re-export of all error context types.
 pub use context::*;
 
+/// Create a [`Report`] for a known `Send + Sync` context.
+#[inline]
+fn new_report<C>(ctx: C) -> Report<C>
+where
+    C: core::error::Error + Send + Sync + 'static,
+{
+    Report::new(ctx)
+}
+
 /// A trait for zero-sized error types that provides convenient error creation methods.
 ///
-/// `ThinContext` extends the functionality of `error_stack::Context` by providing
+/// `ThinContext` extends the functionality of [`rootcause::Report`] by providing
 /// static methods for creating error reports with attachments. This trait is ideally
 /// used for zero-sized error types or types that hold only `'static` references.
 ///
@@ -164,7 +166,7 @@ where
     /// # Arguments
     /// * `ctx` - The source context to convert from
     fn report<C: core::error::Error + Send + Sync + 'static>(ctx: C) -> Report<Self> {
-        Report::new(ctx).change_context(Self::VALUE)
+        new_report(ctx).context(Self::VALUE)
     }
 
     /// Create an error report with an attachment computed by a closure.
@@ -175,7 +177,7 @@ where
     where
         A: Display,
     {
-        Report::new(Self::VALUE).attach(attachment())
+        new_report(Self::VALUE).attach(attachment())
     }
 
     /// Create an error report with a displayable attachment.
@@ -184,7 +186,7 @@ where
     where
         A: Display,
     {
-        Report::new(Self::VALUE).attach(value)
+        new_report(Self::VALUE).attach(value)
     }
     /// Create an error report with a debug-formatted attachment.
     ///
@@ -260,14 +262,14 @@ where
 
 /// Trait for converting `Result<T, E>` into `Result<T, Report<C>>` with automatic error wrapping.
 ///
-/// This trait extends the functionality of `error_stack::IntoReport` by allowing
-/// implicit conversion from any error type to a specific context type with enhanced
+/// This trait extends the functionality of [`ResultExt`]
+/// by allowing implicit conversion from any error type to a specific context type with enhanced
 /// error reporting that includes source chain information.
 pub trait ReportAs<T> {
     /// Convert this result into a report with the specified context type.
     ///
     /// This method automatically converts any `Result<T, E>` where `E` implements
-    /// `Context + Error` into a `Result<T, Report<C>>` where `C` is your desired
+    /// `Error` into a `Result<T, Report<C>>` where `C` is your desired
     /// context type.
     ///
     /// # Example
@@ -293,30 +295,15 @@ impl<T, E: core::error::Error + Send + Sync + 'static> ReportAs<T> for Result<T,
     #[inline]
     #[track_caller]
     fn report_as<C: ThinContext>(self) -> Result<T, Report<C>> {
-        // TODO #[track_caller] on closure
-        // https://github.com/rust-lang/rust/issues/87417
-        // self.map_err(|e| Report::new(C::VALUE).attach(e))
         match self {
             Ok(v) => Ok(v),
             Err(e) => {
                 let ty = any::type_name_of_val(&e);
-                let mut external_report = Report::new(e).attach(ty);
-                let mut curr_source = external_report.current_context().source();
-                let mut child_errs = vec![];
-                while let Some(child_err) = curr_source {
-                    let new_err = format!("{child_err}");
-                    // workaround comparison when the there is an
-                    // error with a transparent inner type to avoid attaching
-                    // the same message twice
-                    if Some(&new_err) != child_errs.last() {
-                        child_errs.push(new_err);
-                    }
-                    curr_source = child_err.source();
-                }
-                while let Some(child_err) = child_errs.pop() {
-                    external_report = external_report.attach(child_err);
-                }
-                Err(external_report.into_ctx())
+                // `SourceChain` makes the report formatter walk `Error::source`,
+                // replacing the manual chain-collection this used to do.
+                let report: Report<E, markers::Mutable, markers::SendSync> =
+                    Report::new_custom::<handlers::SourceChain>(e);
+                Err(report.attach(ty).into_ctx())
             }
         }
     }
@@ -327,7 +314,7 @@ pub trait IntoContext {
     /// Convert this error report to use a different context type.
     ///
     /// This method transforms a `Report<C>` into a `Report<C2>` with `C2` being a [`ThinContext`].
-    /// When the [`std::any::TypeId`] of `C` and `C2` is the same, only a [`Location`] is attached.
+    /// When the [`std::any::TypeId`] of `C` and `C2` is the same, only a location is attached.
     ///
     /// # Example
     ///
@@ -353,22 +340,23 @@ pub trait IntoContext {
     fn into_ctx<C2: ThinContext>(self) -> Report<C2>;
 }
 
-impl<C: 'static> IntoContext for Report<C> {
+impl<C: ?Sized + 'static> IntoContext for Report<C> {
     #[inline]
     #[track_caller]
     fn into_ctx<C2: ThinContext>(self) -> Report<C2> {
-        if TypeId::of::<C>() == TypeId::of::<C2>() {
-            // if C and C2 are zero-sized and have the same TypeId then they are covariant
-            unsafe {
-                return mem::transmute::<Self, Report<C2>>(self.attach_opaque(*Location::caller()));
+        match self.into_dynamic().downcast_report::<C2>() {
+            // Same context type: attach a location, preserving the report tree.
+            Ok(report) => {
+                report.attach_custom::<handlers::LocationHandler, _>(handlers::Location::caller())
             }
+            // Different context type: nest the old report under the new context.
+            Err(report) => report.context(C2::VALUE),
         }
-        self.change_context(C2::VALUE)
     }
 }
 
-/// Extension trait for `Result<T, Report<C>>` that provides context conversion methods.
-pub trait ResultIntoContext: ResultExt {
+/// Extension trait for `Result<T, E>` that provides context conversion methods.
+pub trait ResultIntoContext<V, E>: ResultExt<V, E> {
     /// Convert the error context type of this result.
     ///
     /// This method transforms a `Result<T, E>` into a `Result<T, Report<C>>`, converting
@@ -388,7 +376,7 @@ pub trait ResultIntoContext: ResultExt {
     ///
     /// assert_eq!(parse_data().unwrap(), 42);
     /// ```
-    fn into_ctx<C2: ThinContext>(self) -> Result<Self::Ok, Report<C2>>;
+    fn into_ctx<C2: ThinContext>(self) -> Result<V, Report<C2>>;
 
     /// Chain operations while converting error context (similar to `Result::and_then`).
     ///
@@ -401,7 +389,7 @@ pub trait ResultIntoContext: ResultExt {
     ///
     /// ```
     /// use bigerror::{
-    ///     DbError, NotFound, OptionReport, Report, ResultIntoContext, expect_field,
+    ///     DbError, NotFound, OptionExt, Report, ResultIntoContext, expect_field,
     /// };
     ///
     /// fn find_user(id: u64) -> Result<User, Report<NotFound>> {
@@ -409,7 +397,8 @@ pub trait ResultIntoContext: ResultExt {
     ///         id,
     ///         email: Some("user@example.com".to_string()),
     ///     })
-    ///     .expect_or()
+    ///     .ok_or_report()
+    ///     .into_ctx()
     /// }
     /// struct User {
     ///     id: u64,
@@ -427,7 +416,7 @@ pub trait ResultIntoContext: ResultExt {
     fn and_then_ctx<U, F, C2>(self, op: F) -> Result<U, Report<C2>>
     where
         C2: ThinContext,
-        F: FnOnce(Self::Ok) -> Result<U, Report<C2>>;
+        F: FnOnce(V) -> Result<U, Report<C2>>;
 
     /// Map the success value while converting error context (similar to `Result::map`).
     ///
@@ -449,12 +438,12 @@ pub trait ResultIntoContext: ResultExt {
     fn map_ctx<U, F, C2>(self, op: F) -> Result<U, Report<C2>>
     where
         C2: ThinContext,
-        F: FnOnce(Self::Ok) -> U;
+        F: FnOnce(V) -> U;
 }
 
-impl<T, E: IntoReport> ResultIntoContext for Result<T, E>
+impl<T, E> ResultIntoContext<T, E> for Result<T, E>
 where
-    <E as IntoReport>::Context: Sized + 'static,
+    E: IntoReportCollection<markers::SendSync>,
 {
     #[inline]
     #[track_caller]
@@ -462,7 +451,7 @@ where
         // Can't use `map_err` as `#[track_caller]` is unstable on closures
         match self {
             Ok(ok) => Ok(ok),
-            Err(e) => Err(IntoContext::into_ctx(e.into_report())),
+            Err(e) => Err(e.into_report_collection().context(C2::VALUE)),
         }
     }
 
@@ -475,7 +464,7 @@ where
     {
         match self {
             Ok(t) => op(t),
-            Err(e) => Err(IntoContext::into_ctx(e.into_report())),
+            Err(e) => Err(e.into_report_collection().context(C2::VALUE)),
         }
     }
 
@@ -488,7 +477,7 @@ where
     {
         match self {
             Ok(t) => Ok(op(t)),
-            Err(e) => Err(IntoContext::into_ctx(e.into_report())),
+            Err(e) => Err(e.into_report_collection().context(C2::VALUE)),
         }
     }
 }
@@ -680,7 +669,7 @@ pub trait AttachExt {
     }
 }
 
-impl<C> AttachExt for Report<C> {
+impl<C: ?Sized> AttachExt for Report<C, markers::Mutable, markers::SendSync> {
     #[inline]
     #[track_caller]
     fn attach_kv<K, V>(self, key: K, value: V) -> Self
@@ -716,11 +705,11 @@ impl<C> AttachExt for Report<C> {
     where
         A: Debug,
     {
-        self.attach(Dbg(value))
+        self.attach_custom::<handlers::DebugFmt, _>(value)
     }
 }
 
-impl<T, C> AttachExt for Result<T, Report<C>> {
+impl<T, C: ?Sized> AttachExt for Result<T, Report<C, markers::Mutable, markers::SendSync>> {
     #[inline]
     #[track_caller]
     fn attach_kv<K, V>(self, key: K, value: V) -> Self
@@ -767,8 +756,35 @@ impl<T, C> AttachExt for Result<T, Report<C>> {
     {
         match self {
             Ok(ok) => Ok(ok),
-            Err(report) => Err(report.attach(Dbg(value))),
+            Err(report) => Err(report.attach_custom::<handlers::DebugFmt, _>(value)),
         }
+    }
+}
+
+/// Extension trait for lazily attaching a value to a [`Report`].
+///
+/// This mirrors the old `error-stack` `Report::attach_with` and is deliberately
+/// kept separate from [`AttachExt`] so it does not collide with
+/// [`ResultExt::attach_with`] on
+/// `Result` values.
+pub trait ReportAttachExt: Sized {
+    /// Attach the value produced by `attachment`, evaluated lazily.
+    #[must_use]
+    fn attach_with<A, F>(self, attachment: F) -> Self
+    where
+        A: Display,
+        F: FnOnce() -> A;
+}
+
+impl<C: ?Sized> ReportAttachExt for Report<C, markers::Mutable, markers::SendSync> {
+    #[inline]
+    #[track_caller]
+    fn attach_with<A, F>(self, attachment: F) -> Self
+    where
+        A: Display,
+        F: FnOnce() -> A,
+    {
+        self.attach(attachment())
     }
 }
 
@@ -878,29 +894,16 @@ impl<T, E> ClearResult<T, E> for Result<T, E> {
     }
 }
 
-/// Extension trait for `Option<T>` that provides methods to convert `None` into error reports.
+/// Extension trait for `Option<T>` that provides methods to build `NotFound` reports.
 ///
-/// This trait allows you to easily convert `Option` values into `Result<T, Report<NotFound>>`
-/// with descriptive error messages.
+/// This trait allows you to build `NotFound` reports from `None` values with
+/// descriptive key-value, field, or index attachments. For the plain
+/// `Option -> Report` conversion (including the expected type name), prefer the
+/// upstream [`OptionExt::ok_or_report`].
 pub trait OptionReport<T>
 where
     Self: Sized,
 {
-    /// Convert `None` into a `NotFound` error with type information.
-    ///
-    /// This method transforms an `Option<T>` into a `Result<T, Report<NotFound>>`,
-    /// automatically attaching the type information of `T` to provide context
-    /// about what was expected but not found.
-    ///
-    /// # Example
-    ///
-    /// ```
-    /// use bigerror::{OptionReport, NotFound, Report};
-    ///
-    /// let maybe_value: Option<String> = None;
-    /// let result: Result<String, Report<NotFound>> = maybe_value.expect_or();
-    /// ```
-    fn expect_or(self) -> Result<T, Report<NotFound>>;
     /// Convert `None` into a `NotFound` error with key-value context.
     fn expect_kv<K, V>(self, key: K, value: V) -> Result<T, Report<NotFound>>
     where
@@ -928,21 +931,6 @@ where
     }
 
     /// Convert `None` into a `NotFound` error with a lazily-computed index key.
-    #[deprecated(
-        note = "Use `bigerror::OptionReport::expect_with` instead",
-        since = "0.12.0"
-    )]
-    #[inline]
-    #[track_caller]
-    fn expect_by_fn<F, K>(self, key_fn: F) -> Result<T, Report<NotFound>>
-    where
-        K: Display,
-        F: FnOnce() -> K,
-    {
-        self.expect_kv(Index(key_fn()), ty!(T))
-    }
-
-    /// Convert `None` into a `NotFound` error with a lazily-computed index key.
     #[inline]
     #[track_caller]
     fn expect_with<F, K>(self, key_fn: F) -> Result<T, Report<NotFound>>
@@ -952,31 +940,9 @@ where
     {
         self.expect_kv(Index(key_fn()), ty!(T))
     }
-
-    /// Convert `None` into a `NotFound` That is then propagated to a `ThinContext`
-    #[inline]
-    #[track_caller]
-    fn expect_or_ctx<C>(self) -> Result<T, Report<C>>
-    where
-        C: ThinContext,
-    {
-        self.expect_or().into_ctx()
-    }
 }
 
 impl<T> OptionReport<T> for Option<T> {
-    #[inline]
-    #[track_caller]
-    fn expect_or(self) -> Result<T, Report<NotFound>> {
-        // TODO #[track_caller] on closure
-        // https://github.com/rust-lang/rust/issues/87417
-        // self.ok_or_else(|| Report::new(NotFound))
-        match self {
-            Some(v) => Ok(v),
-            None => Err(NotFound::attach_ty::<T>()),
-        }
-    }
-
     #[inline]
     #[track_caller]
     fn expect_kv<K, V>(self, key: K, value: V) -> Result<T, Report<NotFound>>
@@ -1107,14 +1073,71 @@ macro_rules! expect_field {
         }
     };
 }
-#[cfg(test)]
+
+/// Returns early from the enclosing function with an error if the condition is not met.
+///
+/// `rootcause` provides [`bail!`] but no `ensure!`, so this mirrors the behaviour of
+/// `error-stack`'s `ensure!` on top of [`bail!`].
+///
+/// # Example
+///
+/// ```
+/// use bigerror::{ensure, Report};
+///
+/// fn check(value: i32) -> Result<(), Report> {
+///     ensure!(value > 0, "value must be positive, got {}", value);
+///     Ok(())
+/// }
+///
+/// assert!(check(-1).is_err());
+/// ```
+#[macro_export]
+macro_rules! ensure {
+    ($cond:expr $(,)?) => {
+        if !($cond) {
+            $crate::bail!(concat!("Condition failed: `", stringify!($cond), "`"));
+        }
+    };
+    ($cond:expr, $($args:tt)+) => {
+        if !($cond) {
+            $crate::bail!($($args)+);
+        }
+    };
+}
+
+/// Install the `bigerror` default hooks: colored unicode report formatting and,
+/// when the corresponding features are enabled, automatic backtrace and span
+/// attachment collection.
+///
+/// This is safe to call more than once; subsequent installs are ignored.
+#[cfg(feature = "std")]
+#[allow(unused_mut)]
+pub fn install_hooks() {
+    use rootcause::hooks::{Hooks, builtin_hooks::report_formatter::DefaultReportFormatter};
+
+    let mut hooks = Hooks::new().report_formatter(DefaultReportFormatter::UNICODE_COLORS);
+    #[cfg(feature = "backtrace")]
+    {
+        hooks = hooks.report_creation_hook(rootcause_backtrace::BacktraceCollector {
+            filter: rootcause_backtrace::BacktraceFilter::DEFAULT,
+            capture_backtrace_for_reports_with_children: false,
+        });
+    }
+    #[cfg(feature = "spantrace")]
+    {
+        hooks = hooks.report_creation_hook(rootcause_tracing::SpanCollector::new());
+    }
+    let _ = hooks.install();
+}
+
+#[cfg(all(test, feature = "std"))]
 #[derive(Default)]
 struct MyStruct {
     my_field: Option<()>,
     _string: String,
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "std"))]
 impl MyStruct {
     fn __field<T>(_property: &'static str, _t: T) {}
     const fn my_field(&self) -> Option<()> {
@@ -1122,13 +1145,8 @@ impl MyStruct {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "std"))]
 mod test {
-
-    #[cfg(not(feature = "std"))]
-    use alloc::boxed::Box;
-    #[cfg(not(feature = "std"))]
-    use alloc::string::String;
 
     use crate::attachment::Invalid;
 
@@ -1143,7 +1161,7 @@ mod test {
             let result = $result;
             assert!(result.is_err(), "{:?}", result.unwrap());
             if option_env!("PRINTERR").is_some() {
-                crate::init_colour();
+                crate::install_hooks();
                 #[cfg(feature = "std")]
                 println!("\n{:?}", result.unwrap_err());
             }
@@ -1152,7 +1170,7 @@ mod test {
             let result = $result;
             assert!(result.is_err(), $($arg)+);
             if option_env!("PRINTERR").is_some() {
-                crate::init_colour();
+                crate::install_hooks();
                 #[cfg(feature = "std")]
                 println!("\n{:?}", result.unwrap_err());
             }
@@ -1181,7 +1199,8 @@ mod test {
             Ok("NaN".parse::<usize>().map_err(Box::new)?)
         }
 
-        assert_err!(output().map_err(BoxError::from).change_context(MyError));
+        use rootcause::compat::IntoRootcause;
+        assert_err!(output().into_rootcause().into_ctx::<MyError>());
     }
 
     #[test]
@@ -1193,7 +1212,7 @@ mod test {
                 .attach(ParseError)
         }
 
-        assert_err!(output().change_context(MyError));
+        assert_err!(output().into_ctx::<MyError>());
     }
 
     #[test]
@@ -1210,11 +1229,11 @@ mod test {
                 })
         }
 
-        assert_err!(output().change_context(MyError));
+        assert_err!(output().into_ctx::<MyError>());
     }
     #[test]
     fn option_report() {
-        assert_err!(None::<()>.expect_or());
+        assert_err!(None::<()>.ok_or_report());
 
         let id: u32 = 0xdead_beef;
         assert_err!(None::<bool>.expect_kv("id", id));
@@ -1247,13 +1266,13 @@ mod test {
     #[test]
     fn result_into_ctx() {
         fn output() -> Result<usize, Report<MyError>> {
-            "NaN"
+            let result: Result<usize, Report<MyError>> = "NaN"
                 .parse::<usize>()
                 .map_err(ConversionError::from::<&str, usize>)
-                .change_context(MyError)
-                // since we're going from MyError to MyError, we should just attach a
-                // new Location to the stack
-                .into_ctx()
+                .into_ctx();
+            // since we're going from MyError to MyError, we should just attach a
+            // new location to the report
+            result.map_err(IntoContext::into_ctx)
         }
 
         assert_err!(output());
@@ -1262,7 +1281,7 @@ mod test {
     #[test]
     fn attach_ty_status() {
         fn try_even(num: usize) -> Result<(), Report<MyError>> {
-            if num % 2 != 0 {
+            if !num.is_multiple_of(2) {
                 return Err(InvalidInput::attach_ty_status::<usize>(Invalid).into_ctx());
             }
             Ok(())
@@ -1309,11 +1328,9 @@ mod test {
     fn attach_ty_val() {
         fn compare(mine: usize, other: usize) -> Result<(), Report<MyError>> {
             if other != mine {
-                bail!(
-                    InvalidInput::attach("expected my number!")
-                        .attach_ty_val(other)
-                        .into_ctx()
-                );
+                return Err(InvalidInput::attach("expected my number!")
+                    .attach_ty_val(other)
+                    .into_ctx());
             }
             Ok(())
         }

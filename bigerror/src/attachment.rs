@@ -10,7 +10,6 @@ use alloc::{
 };
 
 use derive_more as dm;
-pub use error_stack::{self, Report, ResultExt};
 
 /// Trait alias for types that can be displayed and used in error attachments.
 ///
@@ -63,12 +62,6 @@ impl<K: fmt::Display, V: fmt::Display> fmt::Display for KeyValue<K, V> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}: {}", self.0, self.1)
     }
-}
-
-impl<C: core::error::Error + Send + Sync + 'static> core::error::Error for KeyValue<Type, C> {}
-impl<C: core::error::Error + Send + Sync + 'static> core::error::Error
-    for KeyValue<&'static str, C>
-{
 }
 
 impl<K: Display, V: Debug> KeyValue<K, Dbg<V>> {
@@ -289,29 +282,17 @@ pub struct Expectation<E, A> {
 #[derive(Debug)]
 pub struct FromTo<F, T>(pub F, pub T);
 
-#[allow(dead_code)]
+/// Box-drawing glyphs used when rendering [`Expectation`] and [`FromTo`].
 enum Symbol {
-    Vertical,
-    VerticalRight,
-    Horizontal,
     HorizontalLeft,
-    HorizontalDown,
-    ArrowRight,
     CurveRight,
-    Space,
 }
 
 impl fmt::Display for Symbol {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let utf8 = match self {
-            Self::Vertical => "\u{2502}",       // │
-            Self::VerticalRight => "\u{251c}",  // ├
-            Self::Horizontal => "\u{2500}",     // ─
             Self::HorizontalLeft => "\u{2574}", // ╴
-            Self::HorizontalDown => "\u{252c}", // ┬
-            Self::ArrowRight => "\u{25b6}",     // ▶
             Self::CurveRight => "\u{2570}",     // ╰
-            Self::Space => " ",
         };
         write!(f, "{utf8}")
     }
@@ -434,7 +415,7 @@ pub fn simple_type_name<T: ?Sized>() -> &'static str {
 #[display("idx [{0}: {}]", simple_type_name::<I>())]
 pub struct Index<I: fmt::Display>(pub I);
 
-#[cfg(test)]
+#[cfg(all(test, feature = "std"))]
 mod test {
 
     use super::*;

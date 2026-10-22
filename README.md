@@ -26,10 +26,10 @@ If [`just`](https://just.systems/) is installed: `just printerr-all` to visualiz
 
 ```sql
 -- This error crate is intended to
--- enhance error-stack:
--- https://hash.dev/blog/announcing-error-stack
--- error-stack `is_fantastic && does_things.in(|_a| functional(approach))` but
--- `error_stack::Report::change_context` can make code noisy when used often
+-- enhance rootcause:
+-- https://github.com/rootcause-rs/rootcause
+-- rootcause `is_fantastic && does_things.in(|_a| functional(approach))` but
+-- `rootcause::Report::context` can make code noisy when used often
 --
 -- ...so why not auto implement a bunch of `From<Error> for MyError`?
 -- and provide fundamental building blocks such as `bigerror::NotFound`

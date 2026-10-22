@@ -1,6 +1,6 @@
 [package]
 name = "bigerror"
-version = "0.13.0"
+version = "0.14.0"
 edition.workspace = true
 description.workspace = true
 license.workspace = true
@@ -9,25 +9,21 @@ repository.workspace = true
 
 [features]
 default = ["std", "backtrace"]
-std = ["error-stack/std", "derive_more/std", "tracing?/std"]
-backtrace = ["error-stack/backtrace"]
+std = ["derive_more/std", "tracing?/std"]
+backtrace = ["std", "dep:rootcause-backtrace"]
+tracing = ["dep:tracing"]
+spantrace = ["std", "tracing", "dep:rootcause-tracing"]
 
-anyhow = ["error-stack/anyhow"]
-eyre = ["error-stack/eyre"]
-futures = ["error-stack/futures"]
-hooks = ["error-stack/hooks"]
-serde = ["error-stack/serde"]
-spantrace = ["error-stack/spantrace"]
-tracing = ["error-stack/tracing"]
-unstable = ["error-stack/unstable"]
-
+anyhow = ["rootcause/compat-anyhow1"]
+eyre = ["rootcause/compat-eyre06"]
 
 [dependencies]
-error-stack = { workspace = true, default-features = false }
+rootcause = { workspace = true }
+rootcause-backtrace = { workspace = true, optional = true }
+rootcause-tracing = { workspace = true, optional = true }
 tracing = { workspace = true, optional = true, features = ["attributes"] }
 bigerror-derive.workspace = true
 derive_more.workspace = true
-rootcause = "0.13.0"
 
 [lints]
 workspace = true

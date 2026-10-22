@@ -6,27 +6,18 @@ use core::time::Duration;
 use std::{path::Path, time::Duration};
 
 #[cfg(not(feature = "std"))]
-use alloc::{boxed::Box, format};
+use alloc::format;
 
 use crate::{
     Index, Report, ThinContext,
     attachment::{self, Display, FromTo, Unsupported, simple_type_name},
-    ty,
+    new_report, report, ty,
 };
 
 #[cfg(feature = "std")]
 use crate::AttachExt;
 
 use crate::{Field, attachment::DisplayDuration};
-
-/// Used to encapsulate opaque `dyn core::error::Error` types.
-///
-/// This wrapper allows you to work with arbitrary error types in a uniform way
-/// while preserving the original error information.
-#[derive(Debug, dm::Display)]
-#[display("{_0}")]
-pub struct BoxError(Box<dyn core::error::Error + 'static + Send + Sync>);
-impl ::core::error::Error for BoxError {}
 
 /// Represents errors emitted while processing bytes into an object.
 ///
@@ -186,33 +177,6 @@ impl ::core::error::Error for Timeout {}
 #[bigerror(crate)]
 pub struct AssertionError;
 
-/// Trait for core error types that can be used in error reporting.
-///
-/// This trait combines the essential bounds needed for error types:
-/// `Debug`, `Display`, `Send`, `Sync`, and `'static`.
-pub trait CoreError: core::fmt::Debug + core::fmt::Display + Send + Sync + 'static {}
-
-impl<T> CoreError for T where T: core::fmt::Debug + core::fmt::Display + Send + Sync + 'static {}
-
-impl BoxError {
-    /// Create a new `BoxError` report from any error type.
-    ///
-    /// This method boxes the error and wraps it in a `Report`.
-    #[track_caller]
-    pub fn new<E>(err: E) -> Report<Self>
-    where
-        E: core::error::Error + 'static + Send + Sync,
-    {
-        Report::new(Self(Box::new(err)))
-    }
-
-    /// Create a `BoxError` report from an already-boxed error.
-    #[track_caller]
-    pub fn from(err: Box<dyn core::error::Error + 'static + Send + Sync>) -> Report<Self> {
-        Report::new(Self(err))
-    }
-}
-
 impl FsError {
     /// Create a filesystem error with path information.
     ///
@@ -222,7 +186,7 @@ impl FsError {
     #[track_caller]
     pub fn with_path(path: impl AsRef<Path>) -> Report<Self> {
         let path = path.as_ref().display().to_string();
-        Report::new(Self).attach_kv("path", path)
+        new_report(Self).attach_kv("path", path)
     }
 }
 
@@ -235,7 +199,7 @@ impl InvalidInput {
     #[track_caller]
     pub fn with_path(path: impl AsRef<Path>) -> Report<Self> {
         let path = path.as_ref().display().to_string();
-        Report::new(Self).attach_kv("path", path)
+        new_report(Self).attach_kv("path", path)
     }
 
     /// Create an invalid input error with type information.
@@ -245,7 +209,7 @@ impl InvalidInput {
     #[track_caller]
     pub fn type_name<T: ?Sized>() -> Report<Self> {
         let type_name = simple_type_name::<T>();
-        Report::new(Self).attach(format!("type: {type_name}"))
+        new_report(Self).attach(format!("type: {type_name}"))
     }
 
     /// Create an invalid input error for unsupported operations.
@@ -254,7 +218,7 @@ impl InvalidInput {
     /// the requested operation is not supported.
     #[track_caller]
     pub fn unsupported() -> Report<Self> {
-        Report::new(Self).attach(Unsupported)
+        new_report(Self).attach(Unsupported)
     }
 }
 
@@ -265,7 +229,7 @@ impl ConversionError {
     /// and target types of the failed conversion.
     #[track_caller]
     pub fn new<F, T>() -> Report<Self> {
-        Report::new(Self).attach(FromTo(ty!(F), ty!(T)))
+        new_report(Self).attach(FromTo(ty!(F), ty!(T)))
     }
 
     /// Create a conversion error from an existing context with type information.
@@ -274,7 +238,9 @@ impl ConversionError {
     /// and attaches the source and target type information.
     #[track_caller]
     pub fn from<F, T>(ctx: impl core::error::Error + Send + Sync + 'static) -> Report<Self> {
-        Self::report(ctx).attach(FromTo(ty!(F), ty!(T)))
+        report!(ctx)
+            .context(Self::VALUE)
+            .attach(FromTo(ty!(F), ty!(T)))
     }
 }
 
@@ -285,7 +251,7 @@ impl NotFound {
     /// field is missing from a data structure.
     #[track_caller]
     pub fn with_field(field: &'static str) -> Report<Self> {
-        Report::new(Self).attach(Field::new(field, attachment::Missing))
+        new_report(Self).attach(Field::new(field, attachment::Missing))
     }
 
     /// Create a not found error for a missing indexed item.
@@ -304,6 +270,6 @@ impl ParseError {
     /// field could not be parsed correctly.
     #[track_caller]
     pub fn with_field(field: &'static str) -> Report<Self> {
-        Report::new(Self).attach(Field::new(field, attachment::Invalid))
+        new_report(Self).attach(Field::new(field, attachment::Invalid))
     }
 }
