@@ -135,30 +135,6 @@ use attachment::{Dbg, Debug, Display};
 /// Re-export of all error context types.
 pub use context::*;
 
-/// Initialize error reporting with colored output.
-///
-/// Sets the error-stack color mode to full color for enhanced readability
-/// in terminals that support ANSI color codes.
-pub fn init_colour() {
-    Report::set_color_mode(ColorMode::Color);
-}
-
-/// Initialize error reporting with emphasis only (no full color).
-///
-/// Sets the error-stack color mode to use emphasis styling without
-/// full color support, suitable for terminals with limited color support.
-pub fn init_emphasis() {
-    Report::set_color_mode(ColorMode::Emphasis);
-}
-
-/// Initialize error reporting with no ANSI formatting.
-///
-/// Disables all color and emphasis styling for plain text output,
-/// suitable for logging or environments that don't support ANSI codes.
-pub fn init_no_ansi() {
-    Report::set_color_mode(ColorMode::None);
-}
-
 /// A trait for zero-sized error types that provides convenient error creation methods.
 ///
 /// `ThinContext` extends the functionality of `error_stack::Context` by providing
